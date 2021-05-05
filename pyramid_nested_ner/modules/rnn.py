@@ -68,6 +68,7 @@ class FastRNN(nn.Module):
         self._init_hidden(batch_size, x.device)
         x, sorted_lengths, original_index = self._batchsort(x, lengths)
         x = pack_padded_sequence(x, sorted_lengths, batch_first=self.bf)
+        x.to(self.device)
         x, self.hidden = self.rnn(x, self.hidden)
         x, _ = pad_packed_sequence(x, total_length=seq_length, batch_first=self.bf)
 
