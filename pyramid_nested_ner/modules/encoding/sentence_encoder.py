@@ -76,7 +76,8 @@ class SentenceEncoder(nn.Module):
 
     def to(self, device, *args, **kwargs):
         self.word_embeddings = self.word_embeddings.to(device, *args, **kwargs)
-        self.char_embeddings = self.char_embeddings.to(device, *args, **kwargs)
+        if self.char_embeddings is not None:
+            self.char_embeddings = self.char_embeddings.to(device, *args, **kwargs)
         self.rnn = self.rnn.to(device, *args, **kwargs)
         self.dense = self.dense.to(device, *args, **kwargs)
         self.dropout = self.dropout.to(device, *args, **kwargs)
