@@ -20,6 +20,7 @@ class FastRNN(nn.Module):
         self.bf = kwargs.get('batch_first', False)
         self.rnn: nn.Module = rnn_class(**kwargs)
         self.hidden = None
+        self.device = 'cpu'
 
     @property
     def input_size(self):
@@ -34,6 +35,7 @@ class FastRNN(nn.Module):
         return self.rnn.hidden_size
 
     def _init_hidden(self, batch_size, device):
+        self.device = device
         d = (self.rnn.num_layers * 2 ** (int(self.rnn.bidirectional)), batch_size, self.rnn.hidden_size)
         if isinstance(self.rnn, nn.GRU):
             self.hidden = torch.zeros(d, device=device)
@@ -68,7 +70,6 @@ class FastRNN(nn.Module):
         self._init_hidden(batch_size, x.device)
         x, sorted_lengths, original_index = self._batchsort(x, lengths)
         x = pack_padded_sequence(x, sorted_lengths, batch_first=self.bf)
-        x.to(self.device)
         x, self.hidden = self.rnn(x, self.hidden)
         x, _ = pad_packed_sequence(x, total_length=seq_length, batch_first=self.bf)
 
@@ -82,5 +83,6 @@ class FastRNN(nn.Module):
         return x[original_index], self.hidden
 
     def to(self, device, *args, **kwargs):
+        self.device = device
         self.rnn.to(device, *args, **kwargs)
         super(FastRNN, self).to(device, *args, **kwargs)
