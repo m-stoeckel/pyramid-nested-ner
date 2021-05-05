@@ -9,7 +9,7 @@ from pyramid_nested_ner.modules.word_embeddings.flair_embeddings import FlairWor
 
 class SentenceEncoder(nn.Module):
 
-    def __init__(
+    def  __init__(
         self,
         word_embeddings,
         char_embeddings=None,

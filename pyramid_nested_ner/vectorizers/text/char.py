@@ -7,6 +7,7 @@ import torch
 class CharVectorizer(TextVectorizer):
 
     PAD = '□'
+    UNK = '¤'
 
     def __init__(self, fit=False):
         self.X = dict()

@@ -175,6 +175,7 @@ class PyramidNer(object):
             language_model=self._model_args['language_model'],
             dropout=self._model_args['encoder_dropout'],
         )
+        sentence_encoder.to(self.device)
 
         if self._model_args['inverse_pyramid']:
             pyramid_cls = BidirectionalPyramidDecoder
@@ -186,10 +187,12 @@ class PyramidNer(object):
             dropout=self._model_args['decoder_dropout'],
             max_depth=self._model_args['pyramid_max_depth']
         )
+        pyramid_decoder.to(self.device)
         decoder_output_size = self._model_args['decoder_hidden_size'] * 2 * (
                 1 + int(self._model_args['inverse_pyramid']))
 
         classifier = LinearDecoder(decoder_output_size, classes=len(self.label_encoder.entities))
+        classifier.to(self.device)
         return self._Model(sentence_encoder, pyramid_decoder, classifier).to(self.device)
 
     def save(self, path, name='pyramid_ner'):
