@@ -65,5 +65,5 @@ class BidirectionalPyramidDecoder(PyramidDecoder):
         return x, h
 
     def to(self, device, *args, **kwargs):
-        self.inverse_cnn = self.inverse_cnn.to(device, *args, **kwargs)
+        self.inverse_cnn.to(device, *args, **kwargs)
         super(PyramidDecoder, self).to(device, *args, **kwargs)

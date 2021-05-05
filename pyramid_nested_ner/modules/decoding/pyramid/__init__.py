@@ -114,6 +114,6 @@ class PyramidDecoder(nn.Module):
         return x, h
 
     def to(self, device, *args, **kwargs):
-        self.rnn = self.rnn.to(device, *args, **kwargs)
-        self.cnn = self.cnn.to(device, *args, **kwargs)
+        self.rnn.to(device, *args, **kwargs)
+        self.cnn.to(device, *args, **kwargs)
         super(PyramidDecoder, self).to(device, *args, **kwargs)

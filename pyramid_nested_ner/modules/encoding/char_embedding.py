@@ -70,6 +70,6 @@ class CharEmbedding(nn.Module):
         return x_forward, x_backward
 
     def to(self, device, *args, **kwargs):
-        self.embedding = self.embedding.to(device, *args, **kwargs)
-        self.rnn = self.rnn.to(device, *args, **kwargs)
+        self.embedding.to(device, *args, **kwargs)
+        self.rnn.to(device, *args, **kwargs)
         super(CharEmbedding, self).to(device, *args, **kwargs)

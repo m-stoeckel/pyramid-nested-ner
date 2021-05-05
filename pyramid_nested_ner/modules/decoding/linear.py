@@ -16,6 +16,6 @@ class LinearDecoder(nn.Module):
             return logits, None
 
     def to(self, device, *args, **kwargs):
-        self.linear_decoder = self.linear_decoder.to(device, *args, **kwargs)
-        self.remedy_decoder = self.remedy_decoder.to(device, *args, **kwargs)
+        self.linear_decoder.to(device, *args, **kwargs)
+        self.remedy_decoder.to(device, *args, **kwargs)
         super(LinearDecoder, self).to(device, *args, **kwargs)

@@ -81,5 +81,5 @@ class FastRNN(nn.Module):
         return x[original_index], self.hidden
 
     def to(self, device, *args, **kwargs):
-        self.rnn = self.rnn.to(device, *args, **kwargs)
+        self.rnn.to(device, *args, **kwargs)
         super(FastRNN, self).to(device, *args, **kwargs)

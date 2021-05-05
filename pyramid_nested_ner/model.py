@@ -30,9 +30,9 @@ class PyramidNer(object):
             return self.classifier(h, h_remedy)
 
         def to(self, device, *args, **kwargs):
-            self.encoder = self.encoder.to(device, *args, **kwargs)
-            self.pyramid = self.pyramid.to(device, *args, **kwargs)
-            self.classifier = self.classifier.to(device, *args, **kwargs)
+            self.encoder.to(device, *args, **kwargs)
+            self.pyramid.to(device, *args, **kwargs)
+            self.classifier.to(device, *args, **kwargs)
             super().to(device, *args, **kwargs)
 
     def __init__(
