@@ -1,17 +1,18 @@
-import torch.nn as nn
-import torch
-import yaml
 import os
 
+import torch
+import torch.nn as nn
+import yaml
+
+from pyramid_nested_ner.data import DataPoint, Entity
+from pyramid_nested_ner.modules.decoding.linear import LinearDecoder
+from pyramid_nested_ner.modules.decoding.pyramid.bidirectional import BidirectionalPyramidDecoder, PyramidDecoder
 from pyramid_nested_ner.modules.encoding import CharEmbedding, SentenceEncoder
 from pyramid_nested_ner.modules.word_embeddings.flair_embeddings import FlairWordEmbeddings
 from pyramid_nested_ner.modules.word_embeddings.transformer_embeddings import TransformerWordEmbeddings
-from pyramid_nested_ner.modules.decoding.pyramid.bidirectional import PyramidDecoder, BidirectionalPyramidDecoder
-from pyramid_nested_ner.modules.decoding.linear import LinearDecoder
-from pyramid_nested_ner.vectorizers.text.word import WordVectorizer
-from pyramid_nested_ner.vectorizers.text.char import CharVectorizer
 from pyramid_nested_ner.vectorizers.labels import PyramidLabelEncoder
-from pyramid_nested_ner.data import DataPoint, Entity
+from pyramid_nested_ner.vectorizers.text.char import CharVectorizer
+from pyramid_nested_ner.vectorizers.text.word import WordVectorizer
 
 
 class PyramidNer(object):
@@ -178,8 +179,7 @@ class PyramidNer(object):
             output_size=self._model_args['encoder_output_size'],
             rnn_class=nn.LSTM,
             language_model=self._model_args['language_model'],
-            dropout=self._model_args['encoder_dropout'],
-            device=self.device
+            dropout=self._model_args['encoder_dropout']
         )
         sentence_encoder.to(self.device)
 
@@ -191,8 +191,7 @@ class PyramidNer(object):
             input_size=self._model_args['encoder_output_size'],
             hidden_size=self._model_args['decoder_hidden_size'],
             dropout=self._model_args['decoder_dropout'],
-            max_depth=self._model_args['pyramid_max_depth'],
-            device=self.device
+            max_depth=self._model_args['pyramid_max_depth']
         )
         pyramid_decoder.to(self.device)
         decoder_output_size = self._model_args['decoder_hidden_size'] * 2 * (
@@ -200,8 +199,7 @@ class PyramidNer(object):
 
         classifier = LinearDecoder(
             decoder_output_size,
-            classes=len(self.label_encoder.entities),
-            device=self.device
+            classes=len(self.label_encoder.entities)
         )
         classifier.to(self.device)
         return self._Model(sentence_encoder, pyramid_decoder, classifier).to(self.device)
