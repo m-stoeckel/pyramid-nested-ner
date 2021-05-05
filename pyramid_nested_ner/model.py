@@ -202,7 +202,9 @@ class PyramidNer(object):
             classes=len(self.label_encoder.entities)
         )
         classifier.to(self.device)
-        return self._Model(sentence_encoder, pyramid_decoder, classifier).to(self.device)
+        model = self._Model(sentence_encoder, pyramid_decoder, classifier)
+        model.to(self.device)
+        return model
 
     def save(self, path, name='pyramid_ner'):
         """
