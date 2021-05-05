@@ -1,6 +1,5 @@
-import torch.nn as nn
 import torch
-
+import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
@@ -19,7 +18,7 @@ class FastRNN(nn.Module):
             )
         super(FastRNN, self).__init__()
         self.bf = kwargs.get('batch_first', False)
-        self.rnn = rnn_class(**kwargs)
+        self.rnn: nn.Module = rnn_class(**kwargs)
         self.hidden = None
 
     @property
@@ -67,7 +66,7 @@ class FastRNN(nn.Module):
             batch_size = x.size(1)
             seq_length = x.size(0)
         self._init_hidden(batch_size, x.device)
-        x, sorted_lengths, original_index = self._batchsort(x,  lengths)
+        x, sorted_lengths, original_index = self._batchsort(x, lengths)
         x = pack_padded_sequence(x, sorted_lengths, batch_first=self.bf)
         x, self.hidden = self.rnn(x, self.hidden)
         x, _ = pad_packed_sequence(x, total_length=seq_length, batch_first=self.bf)
@@ -80,3 +79,7 @@ class FastRNN(nn.Module):
             self.hidden = (h, c)
 
         return x[original_index], self.hidden
+
+    def to(self, device, *args, **kwargs):
+        self.rnn = self.rnn.to(device, *args, **kwargs)
+        super(FastRNN, self).to(device, *args, **kwargs)

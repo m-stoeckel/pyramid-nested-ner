@@ -44,11 +44,11 @@ class CharEmbedding(nn.Module):
 
         # let BatchSize = BS, SequenceLength = SL, EmbeddingDim = ED.
         # remember that a sequence here is a word (sequence of chars)
-        x = self.embedding(x)     # shape: [BS x SL x ED]
+        x = self.embedding(x)  # shape: [BS x SL x ED]
         x, _ = self.rnn(x, mask)  # shape: [BS x SL x rnn_h * rnn_directions]
         if self.rnn.bidirectional:
             x_forward, x_backward = self._separate_directions(x, lengths, words, chars)
-            return torch.cat((x_forward, x_backward), dim=1)    # shape: [BS x 2*rnn_h]
+            return torch.cat((x_forward, x_backward), dim=1)  # shape: [BS x 2*rnn_h]
         else:
             x_forward = x[torch.arange(words), lengths - 1, :]  # shape: [BS x 1*rnn_h]
             return x_forward
@@ -68,3 +68,8 @@ class CharEmbedding(nn.Module):
         x_forward = x[torch.arange(words), lengths - 1, 0, :]
         x_backward = x[:, 0, 1, :]
         return x_forward, x_backward
+
+    def to(self, device, *args, **kwargs):
+        self.embedding = self.embedding.to(device, *args, **kwargs)
+        self.rnn = self.rnn.to(device, *args, **kwargs)
+        super(CharEmbedding, self).to(device, *args, **kwargs)

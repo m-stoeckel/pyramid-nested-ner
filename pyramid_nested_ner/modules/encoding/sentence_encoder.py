@@ -1,37 +1,37 @@
 import torch
 import torch.nn as nn
-
 from torch.nn.utils.rnn import pad_sequence
+
 from pyramid_nested_ner.modules.rnn import FastRNN
-from pyramid_nested_ner.modules.word_embeddings.transformer_embeddings import TransformerWordEmbeddings
 from pyramid_nested_ner.modules.word_embeddings.flair_embeddings import FlairWordEmbeddings
+from pyramid_nested_ner.modules.word_embeddings.transformer_embeddings import TransformerWordEmbeddings
 
 
 class SentenceEncoder(nn.Module):
 
-    def  __init__(
-        self,
-        word_embeddings,
-        char_embeddings=None,
-        hidden_size=100,
-        output_size=200,
-        dropout=0.4,
-        rnn_class=nn.LSTM,
-        language_model=None  # type: TransformerWordEmbeddings
+    def __init__(
+            self,
+            word_embeddings,
+            char_embeddings=None,
+            hidden_size=100,
+            output_size=200,
+            dropout=0.4,
+            rnn_class=nn.LSTM,
+            language_model=None  # type: TransformerWordEmbeddings
     ):
         input_size = word_embeddings.embedding_dim
-        if char_embeddings is not None:   # using char embeddings
+        if char_embeddings is not None:  # using char embeddings
             input_size = input_size + char_embeddings.embedding_dim
 
         super(SentenceEncoder, self).__init__()
         self.word_embeddings = word_embeddings
         self.char_embeddings = char_embeddings
         self.rnn = FastRNN(
-          rnn_class,
-          input_size=input_size,
-          hidden_size=hidden_size,
-          batch_first=True,
-          bidirectional=True
+            rnn_class,
+            input_size=input_size,
+            hidden_size=hidden_size,
+            batch_first=True,
+            bidirectional=True
         )
 
         dense_input = self.rnn.hidden_size * 2
@@ -57,7 +57,7 @@ class SentenceEncoder(nn.Module):
 
     def _concat_char_and_word_embeddings(self, char_vectors, char_mask, word_vectors, word_mask):
         splits = torch.sum(word_mask, dim=1).tolist()
-        char_vectors = self.char_embeddings(char_vectors,  char_mask)
+        char_vectors = self.char_embeddings(char_vectors, char_mask)
         char_vectors = pad_sequence(torch.split(char_vectors, splits), batch_first=True)
         return torch.cat((char_vectors, word_vectors), dim=-1)
 
@@ -73,3 +73,11 @@ class SentenceEncoder(nn.Module):
         x = self.dense(x)
 
         return x, word_mask
+
+    def to(self, device, *args, **kwargs):
+        self.word_embeddings = self.word_embeddings.to(device, *args, **kwargs)
+        self.char_embeddings = self.char_embeddings.to(device, *args, **kwargs)
+        self.rnn = self.rnn.to(device, *args, **kwargs)
+        self.dense = self.dense.to(device, *args, **kwargs)
+        self.dropout = self.dropout.to(device, *args, **kwargs)
+        return super(SentenceEncoder, self).to(device, *args, **kwargs)

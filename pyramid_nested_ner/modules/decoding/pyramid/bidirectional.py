@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+
 from pyramid_nested_ner.modules.decoding.pyramid import PyramidDecoder
 
 
@@ -63,3 +63,7 @@ class BidirectionalPyramidDecoder(PyramidDecoder):
             x = self.inverse_cnn(h.transpose(2, 1)).transpose(2, 1)
 
         return x, h
+
+    def to(self, device, *args, **kwargs):
+        self.inverse_cnn = self.inverse_cnn.to(device, *args, **kwargs)
+        super(PyramidDecoder, self).to(device, *args, **kwargs)

@@ -15,7 +15,6 @@ from pyramid_nested_ner.data import DataPoint, Entity
 
 
 class PyramidNer(object):
-
     class _Model(nn.Module):
 
         def __init__(self, encoder, pyramid, classifier):
@@ -29,23 +28,29 @@ class PyramidNer(object):
             h, h_remedy = self.pyramid(x, mask)
             return self.classifier(h, h_remedy)
 
+        def to(self, device, *args, **kwargs):
+            self.encoder = self.encoder.to(device, *args, **kwargs)
+            self.pyramid = self.pyramid.to(device, *args, **kwargs)
+            self.classifier = self.classifier.to(device, *args, **kwargs)
+            super().to(device, *args, **kwargs)
+
     def __init__(
-        self,
-        word_lexicon,
-        word_embeddings,
-        entities_lexicon,
-        language_model=None,
-        language_model_casing=True,
-        char_embeddings_dim=60,
-        encoder_hidden_size=100,
-        encoder_output_size=200,
-        decoder_hidden_size=100,
-        pyramid_max_depth=None,
-        inverse_pyramid=False,
-        custom_tokenizer=None,
-        decoder_dropout=0.4,
-        encoder_dropout=0.4,
-        device='cpu'
+            self,
+            word_lexicon,
+            word_embeddings,
+            entities_lexicon,
+            language_model=None,
+            language_model_casing=True,
+            char_embeddings_dim=60,
+            encoder_hidden_size=100,
+            encoder_output_size=200,
+            decoder_hidden_size=100,
+            pyramid_max_depth=None,
+            inverse_pyramid=False,
+            custom_tokenizer=None,
+            decoder_dropout=0.4,
+            encoder_dropout=0.4,
+            device='cpu'
     ):
         if isinstance(word_embeddings, str):
             word_embeddings = [word_embeddings]
@@ -174,6 +179,7 @@ class PyramidNer(object):
             rnn_class=nn.LSTM,
             language_model=self._model_args['language_model'],
             dropout=self._model_args['encoder_dropout'],
+            device=self.device
         )
         sentence_encoder.to(self.device)
 
@@ -185,13 +191,18 @@ class PyramidNer(object):
             input_size=self._model_args['encoder_output_size'],
             hidden_size=self._model_args['decoder_hidden_size'],
             dropout=self._model_args['decoder_dropout'],
-            max_depth=self._model_args['pyramid_max_depth']
+            max_depth=self._model_args['pyramid_max_depth'],
+            device=self.device
         )
         pyramid_decoder.to(self.device)
         decoder_output_size = self._model_args['decoder_hidden_size'] * 2 * (
                 1 + int(self._model_args['inverse_pyramid']))
 
-        classifier = LinearDecoder(decoder_output_size, classes=len(self.label_encoder.entities))
+        classifier = LinearDecoder(
+            decoder_output_size,
+            classes=len(self.label_encoder.entities),
+            device=self.device
+        )
         classifier.to(self.device)
         return self._Model(sentence_encoder, pyramid_decoder, classifier).to(self.device)
 
@@ -206,7 +217,7 @@ class PyramidNer(object):
         if not os.path.isdir(path):
             raise ValueError(f"{path} is not a directory.")
 
-        folder = os.path.join(path,  name)
+        folder = os.path.join(path, name)
         os.makedirs(folder, exist_ok=True)
 
         model_metadata = self._model_args

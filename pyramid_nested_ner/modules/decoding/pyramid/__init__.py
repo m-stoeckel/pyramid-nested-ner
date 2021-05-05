@@ -18,7 +18,7 @@ class PyramidDecoder(nn.Module):
         super(PyramidDecoder, self).__init__()
         self.rnn = nn.LSTM(input_size, hidden_size, bidirectional=True, batch_first=True)
         channels = hidden_size * 2
-        self.cnn = nn.Conv1d(in_channels=channels, out_channels=channels,  kernel_size=2)
+        self.cnn = nn.Conv1d(in_channels=channels, out_channels=channels, kernel_size=2)
         self.dropout = nn.Dropout(dropout or 0.)
         self.layer_norm = nn.LayerNorm(channels)
         self._max_depth = max_depth
@@ -105,10 +105,15 @@ class PyramidDecoder(nn.Module):
         h = pack_padded_sequence(x, sorted_lengths, batch_first=self._is_bf)
         h, self.hidden = self.rnn(h, self.hidden)
         h, _ = pad_packed_sequence(h, total_length=x.size(1),
-                                   batch_first=self._is_bf )
+                                   batch_first=self._is_bf)
         h = self.dropout(h)
         if torch.max(sorted_lengths).item() > 1:
             x = self.cnn(h.transpose(2, 1)).transpose(2, 1)
         else:
             x = None
         return x, h
+
+    def to(self, device, *args, **kwargs):
+        self.rnn = self.rnn.to(device, *args, **kwargs)
+        self.cnn = self.cnn.to(device, *args, **kwargs)
+        super(PyramidDecoder, self).to(device, *args, **kwargs)
