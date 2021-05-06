@@ -1,4 +1,5 @@
 import bisect
+import itertools
 import json
 import string
 from collections import defaultdict
@@ -21,8 +22,8 @@ def rasa_data_reader(path):
         yield DataPoint(example['text'], entities)
 
 
-def jsonline_data_reader(path):
-    for example in (json.loads(jsonline) for jsonline in open(path, 'r')):
+def jsonline_data_reader(path, limit=-1, drop_entities=None):
+    for example in (json.loads(jsonline) for jsonline in itertools.islice(open(path, 'r'), limit)):
         text = "".join(c if c in string.printable else CharVectorizer.UNK for c in example['text'])
         entities = [
             Entity(
@@ -33,6 +34,8 @@ def jsonline_data_reader(path):
                 entity['end']
             ) for entity in example['entities']
         ]
+        if drop_entities:
+            entities = list(filter(lambda entity: entity.name not in drop_entities, entities))
 
         yield DataPoint(text, entities)
 

@@ -1,18 +1,17 @@
-from pyramid_nested_ner.model import PyramidNer
-
-from tqdm.autonotebook import tqdm
-from torch.utils.data import DataLoader
-from seqeval.metrics.sequence_labeling import classification_report
 from copy import deepcopy
 
-import torch.nn as nn
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch
+import torch.nn as nn
+from seqeval.metrics.sequence_labeling import classification_report
+from torch.utils.data import DataLoader
+from tqdm.autonotebook import tqdm
+
+from pyramid_nested_ner.model import PyramidNer
 
 
 class PyramidNerTrainer(object):
-
     class _TrainingReport(object):
 
         def __init__(self):
@@ -60,15 +59,15 @@ class PyramidNerTrainer(object):
         return self._model
 
     def train(
-        self,
-        train_set: DataLoader,
-        optimizer,
-        epochs=10,
-        patience=np.inf,
-        dev_data: DataLoader = None,
-        scheduler=None,
-        grad_clip=None,
-        restore_weights_on='loss'  # 'loss' to restore weights with best dev loss, 'f1' for best dev f1
+            self,
+            train_set: DataLoader,
+            optimizer,
+            epochs=10,
+            patience=np.inf,
+            dev_data: DataLoader = None,
+            scheduler=None,
+            grad_clip=None,
+            restore_weights_on='loss'  # 'loss' to restore weights with best dev loss, 'f1' for best dev f1
     ):
         if patience is None:
             patience = 0
@@ -85,37 +84,40 @@ class PyramidNerTrainer(object):
         best_dev_f1, best_dev_loss = 0.0, np.inf
         best_weights = {'loss': None, 'f1': None}
 
-        for epoch in range(epochs):
-            print('==============================')
-            print(f'Training epoch {epoch + 1}...')
-            print('==============================')
-            train_loss = self._training_epoch(train_set, grad_clip)
-            if self._scheduler:
-                self._scheduler.step()
-            if dev_data is not None:
-                report = self.test_model(dev_data, out_dict=True)
-                micro_f1 = report['micro avg']['f1-score'] * 100
-                dev_loss = report['loss']
-                train_report.add_epoch(
-                    train_loss, dev_loss, micro_f1=micro_f1
-                )
-                if dev_loss < best_dev_loss or micro_f1 > best_dev_f1:  # good epoch!!
-                    overall_patience = patience
-                    if dev_loss < best_dev_loss:
-                        best_dev_loss = dev_loss
-                        best_weights['loss'] = deepcopy(self.nnet.state_dict())
-                    if micro_f1 > best_dev_f1:
-                        best_dev_f1 = micro_f1
-                        best_weights[ 'f1' ] = deepcopy(self.nnet.state_dict())
-                elif patience < np.inf:
-                    print(f'Bad epoch... (patience left: {overall_patience}/{patience})')
-                    if not overall_patience:
-                        print('Stopping early (restoring best weights)...')
-                        self.nnet.load_state_dict(best_weights)
-                        break
-                    overall_patience -= 1
-            else:
-                train_report.add_epoch(train_loss, None)
+        try:
+            for epoch in range(epochs):
+                print('==============================')
+                print(f'Training epoch {epoch + 1}...')
+                print('==============================')
+                train_loss = self._training_epoch(train_set, grad_clip)
+                if self._scheduler:
+                    self._scheduler.step()
+                if dev_data is not None:
+                    report = self.test_model(dev_data, out_dict=True)
+                    micro_f1 = report['micro avg']['f1-score'] * 100
+                    dev_loss = report['loss']
+                    train_report.add_epoch(
+                        train_loss, dev_loss, micro_f1=micro_f1
+                    )
+                    if dev_loss < best_dev_loss or micro_f1 > best_dev_f1:  # good epoch!!
+                        overall_patience = patience
+                        if dev_loss < best_dev_loss:
+                            best_dev_loss = dev_loss
+                            best_weights['loss'] = deepcopy(self.nnet.state_dict())
+                        if micro_f1 > best_dev_f1:
+                            best_dev_f1 = micro_f1
+                            best_weights['f1'] = deepcopy(self.nnet.state_dict())
+                    elif patience < np.inf:
+                        print(f'Bad epoch... (patience left: {overall_patience}/{patience})')
+                        if not overall_patience:
+                            print('Stopping early (restoring best weights)...')
+                            self.nnet.load_state_dict(best_weights)
+                            break
+                        overall_patience -= 1
+                else:
+                    train_report.add_epoch(train_loss, None)
+        except KeyboardInterrupt:
+            print("Caught KeyboardInterrupt, stopping training.")
 
         if restore_weights_on and best_weights.get(restore_weights_on) is not None:
             print('Training is done (restoring model\'s best weights)')
@@ -161,7 +163,7 @@ class PyramidNerTrainer(object):
             layers_y_hat = self._model.logits_to_classes(logits)
             remedy_y_hat = self._model.remedy_to_classes(remedy)
             pbar.set_description(f'valid loss: {round(np.mean(loss), 3)}')
-            y_pred, y_true = self._classes_to_iob2(layers_y_hat, y, True, remedy_y_hat,  remedy_y)
+            y_pred, y_true = self._classes_to_iob2(layers_y_hat, y, True, remedy_y_hat, remedy_y)
             pred.extend(y_pred)
             true.extend(y_true)
             pbar.update(1)

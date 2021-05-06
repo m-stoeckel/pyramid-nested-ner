@@ -1,11 +1,11 @@
-from torch.utils.data import Dataset, DataLoader
-from pyramid_nested_ner.vectorizers.text.word import WordVectorizer
-from pyramid_nested_ner.vectorizers.text.char import CharVectorizer
-from pyramid_nested_ner.vectorizers.labels import PyramidLabelEncoder
+import torch
+from torch.utils.data import DataLoader, Dataset
+
 from pyramid_nested_ner.data.sequence_bucketing import SequenceBucketing
 from pyramid_nested_ner.utils.text import default_tokenizer
-
-import torch
+from pyramid_nested_ner.vectorizers.labels import PyramidLabelEncoder
+from pyramid_nested_ner.vectorizers.text.char import CharVectorizer
+from pyramid_nested_ner.vectorizers.text.word import WordVectorizer
 
 
 class PyramidNerDataset(Dataset):
@@ -33,7 +33,7 @@ class PyramidNerDataset(Dataset):
                     actual_batch[name] = tensors.to(self._device)
                 elif isinstance(batch[name], dict):
                     actual_batch[name] = self.collate_fn(
-                                             batch[name])
+                        batch[name])
             return actual_batch
 
         def __len__(self):
@@ -43,12 +43,13 @@ class PyramidNerDataset(Dataset):
             return self._indices[i]
 
     def __init__(
-        self,
-        data_reader,
-        token_lexicon=None,
-        custom_tokenizer=None,
-        char_vectorizer=False,
-        pyramid_max_depth=None
+            self,
+            data_reader,
+            token_lexicon=None,
+            entities_lexicon=None,
+            custom_tokenizer=None,
+            char_vectorizer=False,
+            pyramid_max_depth=None
     ):
         """
 
@@ -80,7 +81,10 @@ class PyramidNerDataset(Dataset):
         self.pyramid_max_depth = pyramid_max_depth
         self.label_encoder = PyramidLabelEncoder()
         self.label_encoder.set_tokenizer(self.tokenizer)
-        self.label_encoder.fit([e.name for x in self.data for e in x.entities])
+        if entities_lexicon is not None:
+            self.label_encoder.fit(entities_lexicon)
+        else:
+            self.label_encoder.fit([e.name for x in self.data for e in x.entities])
 
     def __len__(self):
         return len(self.data)
@@ -97,7 +101,7 @@ class PyramidNerDataset(Dataset):
         data = self._transform_x(sample)
         max_depth = self.pyramid_max_depth
         data['y'], data['y_remedy'] = self.label_encoder.transform(
-                                       sample, max_depth=max_depth)
+            sample, max_depth=max_depth)
         data['id'] = ids.long()
 
         return data
