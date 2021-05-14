@@ -9,13 +9,19 @@ class Entity(object):
         self.start = start
         self.stop = stop
 
-    def __str__(self):
-        return json.dumps({
+    def serialize(self):
+        return {
             'name': self.name,
             'value': self.value,
             'start': self.start,
             'stop': self.stop
-        }, indent=2)
+        }
+
+    def __str__(self):
+        return json.dumps(self.serialize(), indent=2)
+
+    def __repr__(self):
+        return json.dumps(self.serialize(), indent=2)
 
     def __eq__(self, other):
         if type(other) != type(self):
@@ -40,8 +46,8 @@ class DataPoint(object):
                     )
         self.entities = entities
 
-    def __str__(self):
-        return json.dumps({
+    def serialize(self):
+        return {
             'text': self.text,
             'entities': [
                 {
@@ -52,7 +58,13 @@ class DataPoint(object):
                 }
                 for entity in self.entities
             ]
-        }, indent=2)
+        }
+
+    def __str__(self):
+        return json.dumps(self.serialize(), indent=2)
+
+    def __repr__(self):
+        return json.dumps(self.serialize(), indent=2)
 
     def __eq__(self, other):
         if type(other) != type(self):

@@ -3,8 +3,10 @@ import itertools
 import json
 import string
 from collections import defaultdict
+from pathlib import Path
 
 from pyramid_nested_ner.data import DataPoint, Entity
+from pyramid_nested_ner.data.contextualized import SentenceWindowDataPoint
 from pyramid_nested_ner.vectorizers.text.char import CharVectorizer
 
 
@@ -91,3 +93,61 @@ def wikipedia_article_data_reader(path):
             sentence_text = article['text'][sentence_start:sentence_end]
 
             yield DataPoint(sentence_text, entities)
+
+
+def wrg_reader(path):
+    with open(path, 'r') as fp:
+        lines = fp.readlines()
+
+    for idx in range(0, len(lines), 4):
+        text, pos, tags = lines[idx:idx + 3]
+        text, pos, tags = text.strip(), pos.strip(), tags.strip()
+
+        token_offsets = []
+        last_offset = 0
+        while (offset := text.find(" ", last_offset)) > -1:
+            token_offsets.append((last_offset, offset))
+            last_offset = offset + 1
+
+        tokens = list(zip(text.split(), token_offsets))
+
+        entities = []
+        if len(tags) > 0:
+            for tag in tags.split("|"):
+                offsets, category = tag.split()
+                start, end = offsets.split(",")
+                start, end = int(start), int(end)
+                covered = tokens[start:end + 1]
+                first, last = covered[0][1][0], covered[-1][1][1]
+                first, last = int(first), int(last)
+
+                entities.append(
+                    Entity(
+                        category,
+                        text[first:last],
+                        first,
+                        last
+                    )
+                )
+
+        yield DataPoint(text, entities)
+
+
+def wrg_sentence_window_reader(path, window_size=5):
+    path = Path(path)
+    for file in path.iterdir():
+        dataset = list(wrg_reader(str(file.absolute())))
+
+        pre_buffer = []
+        current = dataset.pop(0)
+        post_buffer = dataset[:window_size]
+
+        yield SentenceWindowDataPoint(current.text, current.entities, pre_buffer, post_buffer)
+
+        while len(dataset) > 0:
+            pre_buffer.append(current)
+            pre_buffer = pre_buffer[-window_size:]
+            current = dataset.pop(0)
+            post_buffer = dataset[:window_size]
+
+            yield SentenceWindowDataPoint(current.text, current.entities, pre_buffer, post_buffer)
