@@ -95,7 +95,7 @@ def calc_f1_score(precision, recall) -> Union[np.ndarray, float]:
     return calc_fb_score(precision, recall, 1)
 
 
-def compute_confusion_matrix_values(prediction, ground_truth, category_names):
+def compute_confusion_matrix_values_bioes(prediction, ground_truth, category_names):
     num_categories = len(category_names)
 
     true_positive = np.zeros(num_categories, dtype=np.int)
@@ -121,17 +121,37 @@ def compute_confusion_matrix_values(prediction, ground_truth, category_names):
     return true_positive, false_positive, false_negative
 
 
-def calculate_metrics(predicted_true_positive, predicted_false_positive, predicted_false_negative):
-    shape = predicted_true_positive.shape
+def compute_confusion_matrix_values_spans(predictions, ground_truths, category_names):
+    num_categories = len(category_names)
+
+    true_positives = np.zeros(num_categories, dtype=np.int)
+    false_positives = np.zeros(num_categories, dtype=np.int)
+    false_negatives = np.zeros(num_categories, dtype=np.int)
+
+    for p_sequence, t_sequence in zip(predictions, ground_truths):
+        for preds, truths in zip(p_sequence, t_sequence):
+            preds, truths = set(preds), set(truths)
+            tp = [category_names.index(cat) for cat in preds.intersection(truths)]  # if cat in category_names]
+            fp = [category_names.index(cat) for cat in preds.difference(truths)]  # if cat in category_names]
+            fn = [category_names.index(cat) for cat in truths.difference(preds)]  # if cat in category_names]
+            true_positives[tp] += 1
+            false_positives[fp] += 1
+            false_negatives[fn] += 1
+
+    return true_positives, false_positives, false_negatives
+
+
+def calculate_metrics(true_positives, false_positives, false_negatives):
+    shape = true_positives.shape
     precision, recall = np.zeros(shape), np.zeros(shape)
 
     # Sums
-    prd_positive = predicted_true_positive + predicted_false_positive
-    act_positive = predicted_true_positive + predicted_false_negative
+    pred_positive = true_positives + false_positives
+    act_positive = true_positives + false_negatives
 
     # Precision, Recall, F1-Score per category
-    precision[prd_positive > 0] = predicted_true_positive[prd_positive > 0] / prd_positive[prd_positive > 0]
-    recall[act_positive > 0] = predicted_true_positive[act_positive > 0] / act_positive[act_positive > 0]
+    precision[pred_positive > 0] = true_positives[pred_positive > 0] / pred_positive[pred_positive > 0]
+    recall[act_positive > 0] = true_positives[act_positive > 0] / act_positive[act_positive > 0]
     f1_score = calc_f1_score(precision, recall)
 
     # Macro metrics
@@ -141,45 +161,34 @@ def calculate_metrics(predicted_true_positive, predicted_false_positive, predict
 
     # Micro metrics
     precision_micro, recall_micro = 0., 0.
-    if prd_positive.sum():
-        precision_micro = predicted_true_positive.sum() / prd_positive.sum()
+    if pred_positive.sum():
+        precision_micro = true_positives.sum() / pred_positive.sum()
     if act_positive.sum():
-        recall_micro = predicted_true_positive.sum() / act_positive.sum()
+        recall_micro = true_positives.sum() / act_positive.sum()
     f1_score_micro = calc_f1_score(precision_micro, recall_micro)
 
     # Weighted metrics
-    precision_weighted = (precision * predicted_true_positive / predicted_true_positive.sum()).sum()
-    recall_weighted = (recall * predicted_true_positive / predicted_true_positive.sum()).sum()
-    f1_score_weighted = calc_f1_score(precision_weighted, recall_weighted)
+    if true_positives.sum():
+        precision_weighted = (precision * true_positives / true_positives.sum()).sum()
+        recall_weighted = (recall * true_positives / true_positives.sum()).sum()
+        f1_score_weighted = calc_f1_score(precision_weighted, recall_weighted)
+    else:
+        precision_weighted = 0.
+        recall_weighted = 0.
+        f1_score_weighted = 0.
 
     # Packing return values
-    macro = (precision_macro, recall_macro, f1_score_macro)
-    micro = (precision_micro, recall_micro, f1_score_micro)
-    weighted = (precision_weighted, recall_weighted, f1_score_weighted)
+    return {
+        'precision': precision,
+        'recall': recall,
+        'f1_score': f1_score,
+        'macro': (precision_macro, recall_macro, f1_score_macro),
+        'micro': (precision_micro, recall_micro, f1_score_micro),
+        'weighted': (precision_weighted, recall_weighted, f1_score_weighted)
+    }
 
-    return precision, recall, f1_score, macro, micro, weighted
 
-
-def multi_label_bioes_classification_report(
-        prediction: List[List[Tuple[int, int, str]]],
-        ground_truth: List[List[Tuple[int, int, str]]],
-        category_names: Iterable[str],
-        output_dict=False,
-        digits=2
-):
-    category_names = sorted(category_names)
-
-    true_positive, false_positive, false_negative = compute_confusion_matrix_values(
-        prediction, ground_truth, category_names
-    )
-
-    precision, recall, f1_score, macro, micro, weighted = calculate_metrics(
-        true_positive,
-        false_positive,
-        false_negative
-    )
-
-    # Report building
+def build_reporter(metrics, category_names, support, digits=2, output_dict=False):
     if output_dict:
         reporter = DictReporter()
     else:
@@ -188,22 +197,97 @@ def multi_label_bioes_classification_report(
         width = max(name_width, avg_width, digits)
         reporter = StringReporter(width=width, digits=digits)
 
+    # Report building
     for idx, name in enumerate(category_names):
-        reporter.write(name, precision[idx], recall[idx], f1_score[idx], true_positive[idx])
+        reporter.write(name, metrics['precision'][idx], metrics['recall'][idx], metrics['f1_score'][idx],
+                       support[idx])
     reporter.write_blank()
 
-    reporter.write('Macro Avg', *macro, true_positive.sum())
-    reporter.write('Micro Avg', *micro, true_positive.sum())
-    reporter.write('Weighted Avg', *weighted, true_positive.sum())
+    reporter.write('macro avg', *metrics['macro'], support.sum())
+    reporter.write('micro avg', *metrics['micro'], support.sum())
+    reporter.write('weighted avg', *metrics['weighted'], support.sum())
+
+    return reporter
+
+
+def multi_label_span_classification_report(
+        predictions: List[List[List[str]]],
+        ground_truths: List[List[List[str]]],
+        category_names: Iterable[str],
+        output_dict=False,
+        digits=2
+):
+    category_names = sorted(category_names)
+
+    true_positives, false_positives, false_negatives = compute_confusion_matrix_values_spans(
+        predictions, ground_truths, category_names
+    )
+
+    metrics = calculate_metrics(
+        true_positives,
+        false_positives,
+        false_negatives
+    )
+
+    reporter = build_reporter(metrics, category_names, true_positives, digits=digits, output_dict=output_dict)
 
     return reporter.report()
 
 
-if __name__ == '__main__':
+def multi_label_bioes_classification_report(
+        predictions: List[List[Tuple[int, int, str]]],
+        ground_truths: List[List[Tuple[int, int, str]]],
+        category_names: Iterable[str],
+        output_dict=False,
+        digits=2
+):
+    category_names = sorted(category_names)
+
+    true_positive, false_positive, false_negative = compute_confusion_matrix_values_bioes(
+        predictions, ground_truths, category_names
+    )
+
+    metrics = calculate_metrics(
+        true_positive,
+        false_positive,
+        false_negative
+    )
+
+    reporter = build_reporter(metrics, category_names, true_positive, digits, output_dict)
+
+    return reporter.report()
+
+
+def test_bioes():
     categories = ["ORG", "OTH", "LOC", "PER"]
     report = multi_label_bioes_classification_report(
-        [[(2, 3, "ORG"), (2, 2, "PER"), (5, 7, "OTH")]],
-        [[(2, 3, "ORG"), (2, 2, "PER"), (3, 3, "ORG"), (5, 7, "LOC")]],
+        [[(2, 4, "ORG"), (2, 3, "PER"), (5, 8, "OTH")]],
+        [[(2, 4, "ORG"), (2, 3, "PER"), (3, 4, "ORG"), (5, 8, "LOC")]],
         categories
     )
-    print(report)
+    print("Using BIOES tags")
+    print(report, end="\n\n")
+
+
+def test_spans():
+    categories = ["ORG", "OTH", "LOC", "PER"]
+    report = multi_label_span_classification_report(
+        [
+            [[], [], ["PER"], [], [], [], [], [], []],
+            [[], ["ORG"], [], [], [], [], [], []],
+            [[], [], [], [], [], ["OTH"], []]
+        ],
+        [
+            [[], [], ["PER"], ["ORG"], [], [], [], [], []],
+            [[], ["ORG"], [], [], [], [], [], []],
+            [[], [], [], [], [], ["LOC"], []]
+        ],
+        categories
+    )
+    print("Using spans")
+    print(report, end="\n\n")
+
+
+if __name__ == '__main__':
+    test_bioes()
+    test_spans()
