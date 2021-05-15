@@ -108,6 +108,7 @@ def wrg_reader(path):
         while (offset := text.find(" ", last_offset)) > -1:
             token_offsets.append((last_offset, offset))
             last_offset = offset + 1
+        token_offsets.append((last_offset, len(text)))
 
         tokens = list(zip(text.split(), token_offsets))
 

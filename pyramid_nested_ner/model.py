@@ -78,10 +78,9 @@ class PyramidNer(object):
         }
 
         self.tokenizer = custom_tokenizer or (lambda t: t.split())
-        self.label_encoder = PyramidLabelEncoder()
+        self._initialize_label_encoder(entities_lexicon)
         self.word_vectorizer = WordVectorizer()
         self.char_vectorizer = CharVectorizer()
-        self.label_encoder.fit(entities_lexicon)
         self.word_vectorizer.fit(word_lexicon)
         self.char_vectorizer.fit()
         for component in [self.word_vectorizer, self.char_vectorizer, self.label_encoder]:
@@ -97,6 +96,10 @@ class PyramidNer(object):
 
         self.nnet = self._init_nnet()
 
+    def _initialize_label_encoder(self, entities_lexicon):
+        self.label_encoder = PyramidLabelEncoder()
+        self.label_encoder.fit(entities_lexicon)
+
     @property
     def device(self):
         return self._model_args['device']
@@ -106,12 +109,12 @@ class PyramidNer(object):
         print('New model created!')
 
     def logits_to_classes(self, logits):
-        return [torch.argmax(nn.functional.softmax(logit, dim=-1), dim=-1) for logit in logits]
+        return [torch.argmax(nn.functional.softmax(logit, dim=-1), dim=-1).cpu().detach() for logit in logits]
 
     def remedy_to_classes(self, logits):
         if logits is None:
             return
-        return torch.round(torch.sigmoid(logits))
+        return torch.round(torch.sigmoid(logits)).cpu().detach()
 
     def classes_to_iob2(self, classes, remedy=None):
         labels = self.label_encoder.inverse_transform(classes)
@@ -172,6 +175,18 @@ class PyramidNer(object):
         )
 
     def _init_nnet(self):
+        sentence_encoder = self._init_sentence_encoder()
+
+        pyramid_decoder = self._init_pyramid_decoder()
+        decoder_output_size = self._model_args['decoder_hidden_size'] * 2 * (
+                1 + int(self._model_args['inverse_pyramid']))
+
+        classifier = self._init_linear_decoder(decoder_output_size)
+        model = self._Model(sentence_encoder, pyramid_decoder, classifier)
+        model.to(self.device)
+        return model
+
+    def _init_sentence_encoder(self):
         sentence_encoder = SentenceEncoder(
             self._model_args['word_embeddings'],
             char_embeddings=self._build_char_embeddings(self._model_args['char_embeddings_dim']),
@@ -182,7 +197,9 @@ class PyramidNer(object):
             dropout=self._model_args['encoder_dropout']
         )
         sentence_encoder.to(self.device)
+        return sentence_encoder
 
+    def _init_pyramid_decoder(self):
         if self._model_args['inverse_pyramid']:
             pyramid_cls = BidirectionalPyramidDecoder
         else:
@@ -194,17 +211,15 @@ class PyramidNer(object):
             max_depth=self._model_args['pyramid_max_depth']
         )
         pyramid_decoder.to(self.device)
-        decoder_output_size = self._model_args['decoder_hidden_size'] * 2 * (
-                1 + int(self._model_args['inverse_pyramid']))
+        return pyramid_decoder
 
+    def _init_linear_decoder(self, decoder_output_size):
         classifier = LinearDecoder(
             decoder_output_size,
             classes=len(self.label_encoder.entities)
         )
         classifier.to(self.device)
-        model = self._Model(sentence_encoder, pyramid_decoder, classifier)
-        model.to(self.device)
-        return model
+        return classifier
 
     def save(self, path, name='pyramid_ner'):
         """

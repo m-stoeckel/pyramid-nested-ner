@@ -15,7 +15,8 @@ class PyramidLabelEncoder(object):
     default_tokenizer = default_tokenizer
 
     def __init__(self):
-        self.entities = list()
+        self.entities = []
+        self.iob2_entities = []
 
     def tokenize(self, text):
         return self.default_tokenizer(text)
@@ -23,12 +24,9 @@ class PyramidLabelEncoder(object):
     def set_tokenizer(self, tokenizer: callable):
         self.default_tokenizer = tokenizer
 
-    @property
-    def iob2_entities(self):
-        return [f'{iob2}-{entity}' for entity in self.entities for iob2 in 'IB' if entity]
-
     def fit(self, entities):
         self.entities = [None, *{entity for entity in entities}]
+        self.iob2_entities = [f'{iob2}-{entity}' for entity in self.entities for iob2 in 'IB' if entity]
 
     def transform(self, data, max_depth=None):
         """

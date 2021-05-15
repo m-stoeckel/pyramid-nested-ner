@@ -68,9 +68,20 @@ class PyramidNerDataset(Dataset):
         if not token_lexicon:
             token_lexicon = {token for x in self.data for token in self.tokenizer(x)}
 
+        self._fit_word_vectorizer(token_lexicon)
+
+        self._fit_char_vectorizer(char_vectorizer)
+
+        self.pyramid_max_depth = pyramid_max_depth
+
+        self._fit_label_encoder(entities_lexicon)
+
+    def _fit_word_vectorizer(self, token_lexicon):
         self.word_vectorizer = WordVectorizer()
         self.word_vectorizer.set_tokenizer(self.tokenizer)
         self.word_vectorizer.fit(token_lexicon)
+
+    def _fit_char_vectorizer(self, char_vectorizer):
         if char_vectorizer:
             self.char_vectorizer = CharVectorizer()
             self.char_vectorizer.set_tokenizer(self.tokenizer)
@@ -78,7 +89,7 @@ class PyramidNerDataset(Dataset):
         else:
             self.char_vectorizer = None
 
-        self.pyramid_max_depth = pyramid_max_depth
+    def _fit_label_encoder(self, entities_lexicon):
         self.label_encoder = PyramidLabelEncoder()
         self.label_encoder.set_tokenizer(self.tokenizer)
         if entities_lexicon is not None:
