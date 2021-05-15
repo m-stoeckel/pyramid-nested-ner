@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 from pyramid_nested_ner.training.trainer import PyramidNerTrainer
+from pyramid_nested_ner.utils.metrics import multi_label_span_classification_report
 
 
 class MultiLabelTrainer(PyramidNerTrainer):
@@ -28,3 +29,26 @@ class MultiLabelTrainer(PyramidNerTrainer):
         # event the model from learning anything due to its depth.
 
         return loss
+
+    def _classes_to_iob2(self, pred, true, flatten=False, remedy_pred=None, remedy_true=None):
+        y_pred = self._model.classes_to_iob2(pred, remedy=remedy_pred)
+        y_true = self._model.classes_to_iob2(true, remedy=remedy_true)
+        if len(y_pred) > len(y_true):
+            y_true.extend([[[[] for _ in y] for y in extra_layer] for extra_layer in y_pred[len(y_true):]])
+        if len(y_true) > len(y_pred):
+            y_pred.extend([[[[] for _ in y] for y in extra_layer] for extra_layer in y_true[len(y_pred):]])
+        if flatten:
+            y_pred = [seq for layer in y_pred for seq in layer]
+            y_true = [seq for layer in y_true for seq in layer]
+
+        return y_pred, y_true
+
+    def classification_report(self, y_pred, y_true, out_dict=False):
+        report = multi_label_span_classification_report(
+            y_true,
+            y_pred,
+            self._model.label_encoder.entities,
+            digits=4,
+            output_dict=out_dict
+        )
+        return report

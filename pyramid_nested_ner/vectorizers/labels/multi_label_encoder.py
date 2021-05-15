@@ -1,4 +1,6 @@
 # encoding: utf-8
+from collections import defaultdict
+
 import numpy as np
 import torch
 from torch.nn.utils.rnn import pad_sequence
@@ -14,7 +16,7 @@ class SigmoidMultiLabelEncoder(PyramidLabelEncoder):
 
     def fit(self, entities):
         self.entities = list(sorted({entity for entity in entities}))
-        self.entity_array = np.array([f'B-{entity}' for entity in self.entities], dtype=str)
+        self.entity_array = np.array(self.entities, dtype=str)
         self.iob2_entities = [f'{iob2}-{entity}' for entity in self.entities for iob2 in 'IB' if entity]
 
     def _transform_layer(self, data, layer):
@@ -83,58 +85,70 @@ class SigmoidMultiLabelEncoder(PyramidLabelEncoder):
     #         return pad_sequence(y_layer, batch_first=True)
 
     def _inverse_layer_transform(self, y_layer):
-        sequences_tags = []
-        for sequence in y_layer:
-            tags = []
-            for indicators in sequence:
-                arr = self.entity_array.copy()
-                arr[indicators.cpu() != 1] = 'O'
-                tags.extend(list(arr))
-            sequences_tags.append(tags)
-        return sequences_tags
+        return [
+            [
+                self.entity_array[indicators.cpu() == 1].tolist()
+                for indicators in sequence
+            ]
+            for sequence in y_layer
+        ]
 
-    # FIXME: This does not work with multi-label annotations
     def inverse_remedy_transform(self, y_remedy):
+        # y_remedy: Size([batch_size, num_tokens, 2*num_classes])
 
-        def _recover_span(tensor_slice, entity_name):
-            for j, vect in enumerate(tensor_slice[1:]):
-                if not vect[self.iob2_entities.index(f'I-{entity_name}')]:
-                    return tensor_slice[:j + 1]
-            return tensor_slice
-
-        longest_span, sequences_tags = 0, list()
-
+        longest_span = 0
+        sequences_tags = []
         for sequence in y_remedy:
-            sequence_tags = dict()
+            # sequence: Size([num_tokens, 2*num_classes])
+
+            # Mapping{category: List[[entity_start, entity_start]]}
+            sequence_entities = defaultdict(list)
+            previous_begin_entities = np.full_like(sequence[0].cpu().numpy().reshape(-1, 2)[:, 0], False, dtype=np.bool)
             for offset, logits in enumerate(sequence):
-                for entity in self.entities:
-                    if logits[self.iob2_entities.index(f'B-{entity}')]:
-                        span = _recover_span(sequence[offset:], entity)
-                        if len(span) not in sequence_tags:
-                            sequence_tags[len(span)] = ['O' for _ in range(len(sequence) - (len(span) - 1))]
-                        if 'O' == sequence_tags[len(span)][offset]:
-                            sequence_tags[len(span)][offset] = f'B-{entity}'
-                            longest_span = max(len(span), longest_span)
-                        else:
-                            sequence_tags[len(span)][offset] = None
-                            # print(
-                            #   f"Tokens {span} have two different annotations: "
-                            #   f"{sequence_tags[len(span)][2:]}, and {entity}. "
-                            #   f"Due to this conflict, both annotations will be"
-                            #   f" discarded."
-                            # )
+                np_logits = logits.cpu().numpy().reshape(-1, 2)
+                begin_entities = np_logits[:, 0] == 1
+
+                # Inside tag calculation:
+                # - A begin prediction overrides an inside prediction -> multiplication with inverted begin_entities
+                # - An inside tag requires a preceding begin tag -> multiplication with previous_begin_entities
+                inside_entities = (np_logits[:, 1] == 1) * np.logical_not(begin_entities) * previous_begin_entities
+
+                begin_entities_list = self.entity_array[begin_entities].tolist()
+                for begin_entity in begin_entities_list:
+                    sequence_entities[begin_entity].append([offset, offset + 1])
+                    longest_span = max(longest_span, 1)
+
+                inside_entities_list = self.entity_array[inside_entities].tolist()
+                for inside_entity in inside_entities_list:
+                    entity = sequence_entities[inside_entity][-1]
+                    entity[1] = offset + 1
+                    longest_span = max(longest_span, abs(entity[1] - entity[0]))
+
+                previous_begin_entities = begin_entities
+
+            sequence_tags = {}
+            for entity_name, entities in sequence_entities.items():
+                for start, end in entities:
+                    length = end - start
+                    if length not in sequence_tags:
+                        sequence_tags[length] = [[] for _ in range(len(sequence) - (length - 1))]
+                    sequence_tags[length][start].append(entity_name)
+
             sequences_tags.append(sequence_tags)
 
-        decoded_labels = list()
+        return self._decode_labels(y_remedy, sequences_tags, longest_span)
+
+    @staticmethod
+    def _decode_labels(y_remedy, sequences_tags, longest_span):
+        decoded_labels = []
         for i in range(1, longest_span + 1):
-            decoded_labels_for_order = list()
+            decoded_labels_for_order = []
             for sequence, sequence_tags in zip(y_remedy, sequences_tags):
                 sequence_length = max(0, len(sequence) - (i - 1))
                 if i in sequence_tags:
-                    span = [iob2_tag or 'O' for iob2_tag in sequence_tags[i]]
+                    span = [iob2_tag or [] for iob2_tag in sequence_tags[i]]
                 else:
-                    span = ['O' for _ in range(sequence_length)]
+                    span = [[] for _ in range(sequence_length)]
                 decoded_labels_for_order.append(span)
             decoded_labels.append(decoded_labels_for_order)
-
         return decoded_labels
