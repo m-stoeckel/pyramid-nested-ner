@@ -1,5 +1,5 @@
 from pyramid_nested_ner.model import PyramidNer
-from pyramid_nested_ner.modules.decoding.linear import SigmoidMultiLabelLinerDecoder
+from pyramid_nested_ner.modules.decoding.linear import SigmoidMultiLabelLinearDecoder
 from pyramid_nested_ner.vectorizers.labels.multi_label_encoder import SigmoidMultiLabelEncoder
 
 
@@ -10,7 +10,7 @@ class SigmoidMultiLabelPyramidNer(PyramidNer):
         self.label_encoder.fit(entities_lexicon)
 
     def _init_linear_decoder(self, decoder_output_size):
-        classifier = SigmoidMultiLabelLinerDecoder(
+        classifier = SigmoidMultiLabelLinearDecoder(
             decoder_output_size,
             classes=len(self.label_encoder.entities)
         )
