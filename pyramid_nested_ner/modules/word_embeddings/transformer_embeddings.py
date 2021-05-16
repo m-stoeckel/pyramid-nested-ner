@@ -1,6 +1,8 @@
-import torch
-import flair
 import os
+
+import flair
+import flair.embeddings
+import torch
 
 
 class TransformerWordEmbeddings(object):
@@ -29,16 +31,16 @@ class TransformerWordEmbeddings(object):
                 transformer,
                 layers=layers,
                 fine_tune=False,
-                pooling_operation=pooling_operation,
-                use_scalar_mix=True
+                subtoken_pooling=pooling_operation,
+                layer_mean=True
             )
         except OSError:  # try from_tf=True
             self.embeddings = flair.embeddings.TransformerWordEmbeddings(
                 transformer,
                 layers=layers,
                 fine_tune=False,
-                pooling_operation=pooling_operation,
-                use_scalar_mix=True,
+                subtoken_pooling=pooling_operation,
+                layer_mean=True,
                 from_tf=True
             )
 
