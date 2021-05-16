@@ -10,6 +10,55 @@ import numpy as np
 from seqeval.reporters import DictReporter, StringReporter
 
 
+class LatexReporter(StringReporter):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.buffer = []
+        self.digits = kwargs.get('digits', 2)
+        self.name_width = kwargs.get('name_width', 10)
+        self.score_width = kwargs.get('score_width', 21)
+        self.support_width = kwargs.get('support_width', 16)
+        self.row_fmt = '{:<{name_width}s}' + ' & {:<{score_width}}' * 3 + ' & {:<{support_width}} \\\\'
+
+    def report(self):
+        report = self.write_header()
+        report += '\n'.join(self.buffer)
+        return report
+
+    def write(self, row_name: str, precision: float, recall: float, f1: float, support: int):
+        value_fmt = '\\numprint[\\%]{{{:02.'f'{self.digits}''f}}}'
+        precision = value_fmt.format(precision * 100)
+        recall = value_fmt.format(recall * 100)
+        f1 = value_fmt.format(f1 * 100)
+        support = f'\\numprint{{{support}}}'
+        row = self.row_fmt.format(
+            *[row_name, precision, recall, f1, support],
+            name_width=self.name_width,
+            score_width=self.score_width,
+            support_width=self.support_width,
+            digits=self.digits
+        )
+        self.buffer.append(row)
+
+    def write_header(self):
+        headers = ['Precision', 'Recall', 'F1-Score', 'Support']
+        head_fmt = '{:<{name_width}s}'
+        head_fmt += ' & {:<{score_width}}' * 3
+        head_fmt += ' & {:<{support_width}} \\\\'
+        report = head_fmt.format(
+            '', *headers,
+            name_width=self.name_width,
+            score_width=self.score_width,
+            support_width=self.support_width
+        )
+        report += '\n\n'
+        return report
+
+    def write_blank(self):
+        self.buffer.append('')
+
+
 def _bioes_encode_impl(start, end, in_ex):
     assert in_ex in (0, 1)
     start, end = sorted((start, end))
@@ -194,8 +243,16 @@ def build_reporter(metrics, category_names, support, digits=2, output_dict=False
     else:
         name_width = max(map(len, category_names))
         avg_width = len('Weighted Avg')
-        width = max(name_width, avg_width, digits)
-        reporter = StringReporter(width=width, digits=digits)
+        name_width = max(name_width, avg_width, digits)
+        scores = np.hstack([metrics['precision'], metrics['recall'], metrics['f1_score']])
+        score_width = 20 + int(scores.max() >= 1)
+        support_width = support.max() + 11
+        reporter = LatexReporter(
+            digits=digits,
+            name_width=name_width,
+            score_width=score_width,
+            support_width=support_width
+        )
 
     # Report building
     for idx, name in enumerate(category_names):
@@ -203,9 +260,9 @@ def build_reporter(metrics, category_names, support, digits=2, output_dict=False
                        support[idx])
     reporter.write_blank()
 
-    reporter.write('macro avg', *metrics['macro'], support.sum())
-    reporter.write('micro avg', *metrics['micro'], support.sum())
-    reporter.write('weighted avg', *metrics['weighted'], support.sum())
+    reporter.write('Macro Avg', *metrics['macro'], support.sum())
+    reporter.write('Micro Avg', *metrics['micro'], support.sum())
+    reporter.write('Weighted Avg', *metrics['weighted'], support.sum())
 
     return reporter
 
