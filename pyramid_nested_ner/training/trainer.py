@@ -94,7 +94,7 @@ class PyramidNerTrainer(object):
                     self._scheduler.step()
                 if dev_data is not None:
                     report = self.test_model(dev_data, out_dict=True)
-                    micro_f1 = report['Micro Avg']['f1-score'] * 100
+                    micro_f1 = report['micro avg']['f1-score'] * 100
                     dev_loss = report['loss']
                     train_report.add_epoch(
                         train_loss, dev_loss, micro_f1=micro_f1
@@ -127,6 +127,7 @@ class PyramidNerTrainer(object):
 
     def _training_epoch(self, train_set, grad_clip):
         train_loss = list()
+        self.nnet.train(mode=True)
         pbar = tqdm(total=len(train_set))
         for batch in train_set:
             # forward
@@ -171,7 +172,7 @@ class PyramidNerTrainer(object):
         report = self.classification_report(pred, true, out_dict)
         if out_dict:
             report['loss'] = np.mean(loss)
-            f1_score = round(report["Micro Avg"]["f1-score"] * 100, 2)
+            f1_score = round(report["micro avg"]["f1-score"] * 100, 2)
             pbar.set_description(
                 f'valid loss: {round(np.mean(loss), 2)}; micro f1: {f1_score}%'
             )
@@ -220,7 +221,7 @@ class PyramidNerTrainer(object):
         report = classification_report(
             y_true,
             y_pred,
-            digits=2,
+            digits=4,
             output_dict=out_dict,
             mode='strict',
             zero_division=0,

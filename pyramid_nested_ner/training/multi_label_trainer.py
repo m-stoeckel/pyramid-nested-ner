@@ -48,7 +48,7 @@ class MultiLabelTrainer(PyramidNerTrainer):
             y_true,
             y_pred,
             self._model.label_encoder.entities,
-            digits=4,
+            digits=2,
             output_dict=out_dict
         )
         return report

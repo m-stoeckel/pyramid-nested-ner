@@ -7,14 +7,21 @@ from collections import defaultdict
 from typing import Dict, Iterable, Iterator, List, Set, Tuple, Union
 
 import numpy as np
-from seqeval.reporters import DictReporter, StringReporter
+import seqeval
+from seqeval.reporters import StringReporter
+
+
+class DictReporter(seqeval.reporters.DictReporter):
+    def write_foot(self, *args, **kwargs):
+        return self.write(*args, **kwargs)
 
 
 class LatexReporter(StringReporter):
 
     def __init__(self, *args, **kwargs):
         super().__init__()
-        self.buffer = []
+        self.foot_buffer = []
+        self.body_buffer = []
         self.digits = kwargs.get('digits', 2)
         self.name_width = kwargs.get('name_width', 10)
         self.score_width = kwargs.get('score_width', 21)
@@ -23,40 +30,54 @@ class LatexReporter(StringReporter):
 
     def report(self):
         report = self.write_header()
-        report += '\n'.join(self.buffer)
+        report += '\n'.join(self.foot_buffer)
+        report += '\n\\bottomrule\\endfoot\n'
+        report += '\n'.join(self.body_buffer)
+        report += '\\end{longtable}\n'
         return report
 
-    def write(self, row_name: str, precision: float, recall: float, f1: float, support: int):
-        value_fmt = '\\numprint[\\%]{{{:02.'f'{self.digits}''f}}}'
+    def _write(self, row_name, precision, recall, f1, support):
+        value_fmt = '\\npp{{{:02.'f'{self.digits}''f}}}'
         precision = value_fmt.format(precision * 100)
         recall = value_fmt.format(recall * 100)
         f1 = value_fmt.format(f1 * 100)
-        support = f'\\numprint{{{support}}}'
-        row = self.row_fmt.format(
+        support = f'\\np{{{support}}}'
+        return self.row_fmt.format(
             *[row_name, precision, recall, f1, support],
             name_width=self.name_width,
             score_width=self.score_width,
             support_width=self.support_width,
             digits=self.digits
         )
-        self.buffer.append(row)
+
+    def write(self, row_name: str, precision: float, recall: float, f1: float, support: int):
+        row = self._write(row_name, precision, recall, f1, support)
+        self.body_buffer.append(row)
+
+    def write_foot(self, row_name: str, precision: float, recall: float, f1: float, support: int):
+        row = self._write(row_name, precision, recall, f1, support)
+        self.foot_buffer.append(row)
 
     def write_header(self):
-        headers = ['Precision', 'Recall', 'F1-Score', 'Support']
-        head_fmt = '{:<{name_width}s}'
+        report = '\\begin{longtable}{lrrrr}\n' \
+                 '\\caption[Short Caption]{Long Caption.\\label{tab:}} \\\\ % TODO: Caption\n' \
+                 '\\toprule\n'
+
+        headers = ['Category', 'Precision', 'Recall', 'F1-Score', 'Support']
+        head_fmt = '{:<{name_width}}'
         head_fmt += ' & {:<{score_width}}' * 3
         head_fmt += ' & {:<{support_width}} \\\\'
-        report = head_fmt.format(
+        report += head_fmt.format(
             '', *headers,
             name_width=self.name_width,
             score_width=self.score_width,
             support_width=self.support_width
         )
-        report += '\n\n'
+        report += '\n\\midrule\\endhead\\midrule\n'
         return report
 
     def write_blank(self):
-        self.buffer.append('')
+        self.body_buffer.append('')
 
 
 def _bioes_encode_impl(start, end, in_ex):
@@ -242,11 +263,11 @@ def build_reporter(metrics, category_names, support, digits=2, output_dict=False
         reporter = DictReporter()
     else:
         name_width = max(map(len, category_names))
-        avg_width = len('Weighted Avg')
+        avg_width = len('weighted avg')
         name_width = max(name_width, avg_width, digits)
         scores = np.hstack([metrics['precision'], metrics['recall'], metrics['f1_score']])
-        score_width = 20 + int(scores.max() >= 1)
-        support_width = support.max() + 11
+        score_width = 11 + int(scores.max() >= 1)
+        support_width = len(str(support.max())) + 5
         reporter = LatexReporter(
             digits=digits,
             name_width=name_width,
@@ -258,11 +279,10 @@ def build_reporter(metrics, category_names, support, digits=2, output_dict=False
     for idx, name in enumerate(category_names):
         reporter.write(name, metrics['precision'][idx], metrics['recall'][idx], metrics['f1_score'][idx],
                        support[idx])
-    reporter.write_blank()
 
-    reporter.write('Macro Avg', *metrics['macro'], support.sum())
-    reporter.write('Micro Avg', *metrics['micro'], support.sum())
-    reporter.write('Weighted Avg', *metrics['weighted'], support.sum())
+    reporter.write_foot('Macro Avg' if not output_dict else 'macro avg', *metrics['macro'], support.sum())
+    reporter.write_foot('Micro Avg' if not output_dict else 'micro avg', *metrics['micro'], support.sum())
+    reporter.write_foot('Weighted Avg' if not output_dict else 'weighted avg', *metrics['weighted'], support.sum())
 
     return reporter
 
