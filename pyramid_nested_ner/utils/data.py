@@ -151,4 +151,4 @@ def wrg_sentence_window_reader(path, window_size=5):
             current = dataset.pop(0)
             post_buffer = dataset[:window_size]
 
-            yield SentenceWindowDataPoint(current.text, current.entities, pre_buffer, post_buffer)
+            yield SentenceWindowDataPoint(current.text, current.entities, pre_buffer[:], post_buffer[:])
