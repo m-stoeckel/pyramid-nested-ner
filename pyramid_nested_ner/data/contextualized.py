@@ -22,8 +22,8 @@ class SentenceWindowDataPoint(DataPoint):
                 }
                 for entity in self.entities
             ],
-            "pre_data_points": [dp.serialize() for dp in self.pre_data_points],
-            "post_data_points": [dp.serialize() for dp in self.post_data_points]
+            'pre_data_points': [dp.serialize() for dp in self.pre_data_points],
+            'post_data_points': [dp.serialize() for dp in self.post_data_points]
         }
 
     def __str__(self):

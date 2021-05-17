@@ -25,8 +25,3 @@ class LinearDecoder(nn.Module):
         self.linear_decoder.to(device, *args, **kwargs)
         self.remedy_decoder.to(device, *args, **kwargs)
         super(LinearDecoder, self).to(device, *args, **kwargs)
-
-
-class SigmoidMultiLabelLinearDecoder(LinearDecoder):
-    def _init_remedy_decoder(self, classes, input_size):
-        return nn.Linear(input_size, classes * 2)

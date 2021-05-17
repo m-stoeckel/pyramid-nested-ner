@@ -35,6 +35,8 @@ class PyramidNer(object):
             self.classifier.to(device, *args, **kwargs)
             super().to(device, *args, **kwargs)
 
+    _model_args = {}
+
     def __init__(
             self,
             word_lexicon,
@@ -62,7 +64,7 @@ class PyramidNer(object):
                 padding_idx=0
             )
 
-        self._model_args = {
+        self._model_args.update({
             'word_embeddings': word_embeddings.to(device),
             'language_model': language_model,
             'char_embeddings_dim': char_embeddings_dim,
@@ -75,7 +77,7 @@ class PyramidNer(object):
             'decoder_dropout': decoder_dropout,
             'encoder_dropout': encoder_dropout,
             'device': device
-        }
+        })
 
         self.tokenizer = custom_tokenizer or (lambda t: t.split())
         self._initialize_label_encoder(entities_lexicon)
