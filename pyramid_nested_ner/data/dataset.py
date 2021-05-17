@@ -29,6 +29,8 @@ class PyramidNerDataset(Dataset):
             for name, tensors in self._wrapped_dataset[batch].items():
                 if name == 'y':
                     actual_batch[name] = [tensor.to(self._device) for tensor in tensors]
+                if isinstance(batch[name], list) and isinstance(batch[name][0], torch.Tensor):
+                    batch[name] = [tensor.to(self._device) for tensor in batch[name]]
                 elif isinstance(batch[name], torch.Tensor):
                     actual_batch[name] = tensors.to(self._device)
                 elif isinstance(batch[name], dict):
@@ -132,6 +134,8 @@ class PyramidNerDataset(Dataset):
             batch = batch[0]
             for name in batch.keys():
                 if name == 'y':
+                    batch[name] = [tensor.to(device) for tensor in batch[name]]
+                if isinstance(batch[name], list) and isinstance(batch[name][0], torch.Tensor):
                     batch[name] = [tensor.to(device) for tensor in batch[name]]
                 elif isinstance(batch[name], torch.Tensor):
                     batch[name] = batch[name].to(device)
