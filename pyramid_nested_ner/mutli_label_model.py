@@ -1,22 +1,28 @@
+import enum
 from typing import Optional
 
-from flair.embeddings import SentenceTransformerDocumentEmbeddings, TransformerDocumentEmbeddings
-
 from pyramid_nested_ner.model import PyramidNer
-from pyramid_nested_ner.modules.decoding.multi_label import ContextualSigmoidLinearDecoder, \
-    SigmoidLinearDecoder
+from pyramid_nested_ner.modules.decoding.multi_label import ContextualOneVsRestDecoder, ContextualSigmoidLinearDecoder, \
+    OneVsRestDecoder, SigmoidLinearDecoder
 from pyramid_nested_ner.modules.encoding.contextual_encoder import DocumentRNNEncoder
 from pyramid_nested_ner.vectorizers.labels.multi_label_encoder import SigmoidMultiLabelEncoder
 
 
 class SigmoidMultiLabelPyramid(PyramidNer):
+    class ClassifierType(enum.Enum):
+        linear = SigmoidLinearDecoder
+        one_vs_rest = OneVsRestDecoder
+
+    def __init__(self, *args, classifier_type='linear', **kwargs):
+        self.classifier_type = classifier_type
+        super(SigmoidMultiLabelPyramid, self).__init__(*args, **kwargs)
 
     def _initialize_label_encoder(self, entities_lexicon):
         self.label_encoder = SigmoidMultiLabelEncoder()
         self.label_encoder.fit(entities_lexicon)
 
     def _init_linear_decoder(self, decoder_output_size):
-        classifier = SigmoidLinearDecoder(
+        classifier = self.ClassifierType[self.classifier_type].value(
             decoder_output_size,
             classes=len(self.label_encoder.entities)
         )
@@ -31,7 +37,9 @@ class SigmoidMultiLabelPyramid(PyramidNer):
 
 
 class DocumentRNNSentenceWindowPyramid(SigmoidMultiLabelPyramid):
-    DOCUMENT_EMBEDDING_MODELS = (TransformerDocumentEmbeddings, SentenceTransformerDocumentEmbeddings)
+    class ClassifierType(enum.Enum):
+        linear = ContextualSigmoidLinearDecoder
+        one_vs_rest = ContextualOneVsRestDecoder
 
     class _Model(SigmoidMultiLabelPyramid._Model):
         def __init__(self, sentence_encoder, pyramid, context_encoder, classifier):
@@ -141,7 +149,7 @@ class DocumentRNNSentenceWindowPyramid(SigmoidMultiLabelPyramid):
         return context_encoder
 
     def _init_linear_decoder(self, decoder_output_size):
-        classifier = ContextualSigmoidLinearDecoder(
+        classifier = self.ClassifierType[self.classifier_type].value(
             decoder_output_size,
             classes=len(self.label_encoder.entities)
         )
