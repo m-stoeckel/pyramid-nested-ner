@@ -3,7 +3,6 @@ import json
 import zlib
 from datetime import datetime
 
-import numpy as np
 import torch
 
 from pyramid_nested_ner.data.mutli_label_dataset import SigmoidMultiLabelNerDataset as Dataset
@@ -15,8 +14,8 @@ from pyramid_nested_ner.utils.data import wrg_reader
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
-def hex_crc32_dict(mapping):
-    return hex(zlib.crc32(str(mapping).encode()))[2:]
+def crc32_hex_dict(mapping):
+    return hex(zlib.crc32(json.dumps(mapping, sort_keys=True).encode()))[2:]
 
 
 def timestamp():
@@ -107,6 +106,7 @@ def run_training(args: dict):
     pyramid_ner = Pyramid(
         word_lexicon=word_lexicon,
         entities_lexicon=entities_lexicon,
+        classifier_type=args['classifier_type'],
         word_embeddings=args['word_embeddings'],
         language_model=args['language_model'],
         char_embeddings_dim=args['char_embeddings_dim'],
@@ -140,27 +140,29 @@ def run_training(args: dict):
 
     formatted_report = trainer.test_model(test_data, out_dict=False)
     print(formatted_report)
-    with open(f"report_{hex_crc32_dict(args)}_{timestamp()}.json", 'w') as fp:
+    with open(f"report_{crc32_hex_dict(args)}_{timestamp()}.json", 'w') as fp:
         fp.write(json.dumps(
             {
                 'model_name': Pyramid.__name__,
                 'dataset_name': Dataset.__name__,
                 'args': args,
                 'train_report': train_report.report.to_dict(),
-                'formatted_report': formatted_report,
-            }
+            }, indent=2
         ))
+    with open(f"report_{crc32_hex_dict(args)}_{timestamp()}.tex", 'w') as fp:
+        fp.write(formatted_report)
 
 
 def get_default_argparser():
     parser = argparse.ArgumentParser(description='Run training')
     parser.add_argument('--word_embeddings', type=str, nargs='+', default=['en-glove', 'en-crawl'])
-    parser.add_argument('--language_model', type=str, default='')
+    parser.add_argument('--language_model', type=str, default=None)
+    parser.add_argument('--classifier_type', type=str, default='linear', choices=['linear', 'one_vs_rest'])
     parser.add_argument('--restore_weights_on', type=str, default='loss')
     parser.add_argument('--shuffle_train', type=bool, default=False)
     parser.add_argument('--bucketing', type=bool, default=True)
     parser.add_argument('--epochs', type=int, default=100)
-    parser.add_argument('--patience', type=int, default=np.inf)
+    parser.add_argument('--patience', type=int, default=5)
     parser.add_argument('--char_embeddings_dim', type=int, default=60)
     parser.add_argument('--encoder_hidden_size', type=int, default=100)
     parser.add_argument('--encoder_output_size', type=int, default=200)

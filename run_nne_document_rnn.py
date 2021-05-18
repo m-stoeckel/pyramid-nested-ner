@@ -7,7 +7,7 @@ from pyramid_nested_ner.mutli_label_model import DocumentRNNSentenceWindowPyrami
 from pyramid_nested_ner.training.multi_label_trainer import MultiLabelTrainer
 from pyramid_nested_ner.training.optim import get_default_sgd_optim
 from pyramid_nested_ner.utils.data import wrg_sentence_window_reader
-from run_nne_sigmoid import get_default_argparser, hex_crc32_dict, load_vocab, timestamp
+from run_nne_sigmoid import get_default_argparser, crc32_hex_dict, load_vocab, timestamp
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -131,7 +131,7 @@ def run_training(args: dict):
 
     formatted_report = trainer.test_model(test_data, out_dict=False)
     print(formatted_report)
-    with open(f"report_{hex_crc32_dict(args)}_{timestamp()}.json", 'w') as fp:
+    with open(f"report_{crc32_hex_dict(args)}_{timestamp()}.json", 'w') as fp:
         fp.write(json.dumps(
             {
                 'model_name': Pyramid.__name__,
