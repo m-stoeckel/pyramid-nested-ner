@@ -26,14 +26,14 @@ class LatexReporter(StringReporter):
         self.name_width = kwargs.get('name_width', 10)
         self.score_width = kwargs.get('score_width', 21)
         self.support_width = kwargs.get('support_width', 16)
-        self.row_fmt = '{:<{name_width}s}' + ' & {:<{score_width}}' * 3 + ' & {:<{support_width}} \\\\'
+        self.row_fmt = '\t{:<{name_width}s}' + ' & {:<{score_width}}' * 3 + ' & {:<{support_width}} \\\\'
 
     def report(self):
         report = self.write_header()
         report += '\n'.join(self.foot_buffer)
-        report += '\n\\bottomrule\\endfoot\n'
+        report += '\n\t\\bottomrule\\endfoot\n'
         report += '\n'.join(self.body_buffer)
-        report += '\\end{longtable}\n'
+        report += '\n\\end{longtable}\n'
         return report
 
     def _write(self, row_name, precision, recall, f1, support):
@@ -60,8 +60,8 @@ class LatexReporter(StringReporter):
 
     def write_header(self):
         report = '\\begin{longtable}{lrrrr}\n' \
-                 '\\caption[Short Caption]{Long Caption.\\label{tab:}} \\\\ % TODO: Caption\n' \
-                 '\\toprule\n'
+                 '\t\\caption[Short Caption]{Long Caption.\\label{tab:}} \\\\ % TODO: Caption\n' \
+                 '\t\\toprule\n'
 
         headers = ['Category', 'Precision', 'Recall', 'F1-Score', 'Support']
         head_fmt = '{:<{name_width}}'
@@ -73,7 +73,7 @@ class LatexReporter(StringReporter):
             score_width=self.score_width,
             support_width=self.support_width
         )
-        report += '\n\\midrule\\endhead\\midrule\n'
+        report += '\n\t\\midrule\\endhead\\midrule\n'
         return report
 
     def write_blank(self):
