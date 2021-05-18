@@ -88,6 +88,7 @@ def run_training(args: dict):
     pyramid_ner = Pyramid(
         word_lexicon=word_lexicon,
         entities_lexicon=entities_lexicon,
+        classifier_type=args['classifier_type'],
         word_embeddings=args['word_embeddings'],
         language_model=args['language_model'],
         char_embeddings_dim=args['char_embeddings_dim'],

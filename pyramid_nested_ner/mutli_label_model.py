@@ -1,20 +1,22 @@
-import enum
+from enum import Enum
 from typing import Optional
 
 from pyramid_nested_ner.model import PyramidNer
-from pyramid_nested_ner.modules.decoding.multi_label import ContextualOneVsRestDecoder, ContextualSigmoidLinearDecoder, \
-    OneVsRestDecoder, SigmoidLinearDecoder
+from pyramid_nested_ner.modules.decoding.multi_label import ContextualOneVsRestConvDecoder, \
+    ContextualOneVsRestMultiHeadDecoder, ContextualSigmoidLinearDecoder, \
+    OneVsRestConvDecoder, OneVsRestMultiHeadDecoder, SigmoidLinearDecoder
 from pyramid_nested_ner.modules.encoding.contextual_encoder import DocumentRNNEncoder
 from pyramid_nested_ner.vectorizers.labels.multi_label_encoder import SigmoidMultiLabelEncoder
 
 
 class SigmoidMultiLabelPyramid(PyramidNer):
-    class ClassifierType(enum.Enum):
+    class ClassifierType(Enum):
         linear = SigmoidLinearDecoder
-        one_vs_rest = OneVsRestDecoder
+        ovr_conv = OneVsRestConvDecoder
+        ovr_multihead = OneVsRestMultiHeadDecoder
 
     def __init__(self, *args, classifier_type='linear', **kwargs):
-        self.classifier_type = classifier_type
+        self.classifier_cls = self.ClassifierType[classifier_type].value
         super(SigmoidMultiLabelPyramid, self).__init__(*args, **kwargs)
 
     def _initialize_label_encoder(self, entities_lexicon):
@@ -22,7 +24,7 @@ class SigmoidMultiLabelPyramid(PyramidNer):
         self.label_encoder.fit(entities_lexicon)
 
     def _init_linear_decoder(self, decoder_output_size):
-        classifier = self.ClassifierType[self.classifier_type].value(
+        classifier = self.classifier_cls(
             decoder_output_size,
             classes=len(self.label_encoder.entities)
         )
@@ -37,9 +39,10 @@ class SigmoidMultiLabelPyramid(PyramidNer):
 
 
 class DocumentRNNSentenceWindowPyramid(SigmoidMultiLabelPyramid):
-    class ClassifierType(enum.Enum):
+    class ClassifierType(Enum):
         linear = ContextualSigmoidLinearDecoder
-        one_vs_rest = ContextualOneVsRestDecoder
+        ovr_conv = ContextualOneVsRestConvDecoder
+        ovr_multihead = ContextualOneVsRestMultiHeadDecoder
 
     class _Model(SigmoidMultiLabelPyramid._Model):
         def __init__(self, sentence_encoder, pyramid, context_encoder, classifier):
@@ -149,7 +152,7 @@ class DocumentRNNSentenceWindowPyramid(SigmoidMultiLabelPyramid):
         return context_encoder
 
     def _init_linear_decoder(self, decoder_output_size):
-        classifier = self.ClassifierType[self.classifier_type].value(
+        classifier = self.classifier_cls(
             decoder_output_size,
             classes=len(self.label_encoder.entities)
         )

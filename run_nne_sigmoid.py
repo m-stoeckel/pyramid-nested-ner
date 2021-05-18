@@ -157,7 +157,8 @@ def get_default_argparser():
     parser = argparse.ArgumentParser(description='Run training')
     parser.add_argument('--word_embeddings', type=str, nargs='+', default=['en-glove', 'en-crawl'])
     parser.add_argument('--language_model', type=str, default=None)
-    parser.add_argument('--classifier_type', type=str, default='linear', choices=['linear', 'one_vs_rest'])
+    parser.add_argument('--classifier_type', type=str, default='linear',
+                        choices=['linear', 'ovr_conv', 'ovr_multihead'])
     parser.add_argument('--restore_weights_on', type=str, default='loss')
     parser.add_argument('--shuffle_train', type=bool, default=False)
     parser.add_argument('--bucketing', type=bool, default=True)
