@@ -94,37 +94,50 @@ class SigmoidMultiLabelEncoder(PyramidLabelEncoder):
         ]
 
     def inverse_remedy_transform(self, y_remedy):
-        # y_remedy: Size([batch_size, num_tokens, 2*num_classes])
-
         longest_span = 0
         sequences_tags = []
         for sequence in y_remedy:
-            # sequence: Size([num_tokens, 2*num_classes])
-
-            # Mapping{category: List[[entity_start, entity_start]]}
+            # Keep a list for each entity class for both entities that are already finished, and those entities
+            # that may be continued with the next token
             sequence_entities = defaultdict(list)
-            previous_begin_entities = np.full_like(sequence[0].cpu().numpy().reshape(-1, 2)[:, 0], False, dtype=np.bool)
+            current_entities = defaultdict(list)
+            previous_entities = np.full_like(sequence[0].cpu().numpy().reshape(-1, 2)[:, 0], False, dtype=np.bool)
+
+            # As the modified remedy solution predicts multiple labels per token, sequences can both begin and continue
+            # on any given token. As such, all entities, that have begone on a previous token, and have not ended yet,
+            # are updated each round. This may lead to misclassifications with partially overlapping entities.
+            # However, the NNE dataset does not contain any partially overlapping annotations.
             for offset, logits in enumerate(sequence):
                 np_logits = logits.cpu().numpy().reshape(-1, 2)
                 begin_entities = np_logits[:, 0] == 1
 
-                # Inside tag calculation:
-                # - A begin prediction overrides an inside prediction -> multiplication with inverted begin_entities
-                # - An inside tag requires a preceding begin tag -> multiplication with previous_begin_entities
-                inside_entities = (np_logits[:, 1] == 1) * np.logical_not(begin_entities) * previous_begin_entities
+                # Inside tag calculation
+                # An inside tag requires a preceding begin tag -> multiplication with previous_entities.
+                inside_entities = (np_logits[:, 1] == 1) * previous_entities
 
+                # Add each beginning entity to its respective current list.
                 begin_entities_list = self.entity_array[begin_entities].tolist()
                 for begin_entity in begin_entities_list:
-                    sequence_entities[begin_entity].append([offset, offset + 1])
+                    current_entities[begin_entity].append([offset, offset + 1])
                     longest_span = max(longest_span, 1)
 
+                # Extend all continued entities by increasing their span-end offset.
                 inside_entities_list = self.entity_array[inside_entities].tolist()
                 for inside_entity in inside_entities_list:
-                    entity = sequence_entities[inside_entity][-1]
-                    entity[1] = offset + 1
-                    longest_span = max(longest_span, abs(entity[1] - entity[0]))
+                    for entity in current_entities[inside_entity]:
+                        entity[1] = offset + 1
+                        longest_span = max(longest_span, abs(entity[1] - entity[0]))
 
-                previous_begin_entities = begin_entities
+                previous_entities = begin_entities | inside_entities
+
+                # Push all entities, that neither started nor continued on this token, to the sequence_entities lists
+                for missing_entity in self.entity_array[np.logical_not(previous_entities)].tolist():
+                    sequence_entities[missing_entity].extend(current_entities[missing_entity])
+                    current_entities[missing_entity] = []
+
+            # Push remaining entities to sequence_entities lists
+            for key, value in current_entities.items():
+                sequence_entities[key].extend(value)
 
             sequence_tags = {}
             for entity_name, entities in sequence_entities.items():
