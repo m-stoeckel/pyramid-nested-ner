@@ -109,9 +109,9 @@ class PyramidNerTrainer(object):
                             best_weights['f1'] = deepcopy(self.nnet.state_dict())
                     elif patience < np.inf:
                         print(f'Bad epoch... (patience left: {overall_patience}/{patience})')
-                        if not overall_patience:
+                        if not overall_patience and best_weights.get(restore_weights_on) is not None:
                             print('Stopping early (restoring best weights)...')
-                            self.nnet.load_state_dict(best_weights)
+                            self.nnet.load_state_dict(best_weights[restore_weights_on], strict=False)
                             break
                         overall_patience -= 1
                 else:
@@ -121,7 +121,7 @@ class PyramidNerTrainer(object):
 
         if restore_weights_on and best_weights.get(restore_weights_on) is not None:
             print('Training is done (restoring model\'s best weights)')
-            self.nnet.load_state_dict(best_weights[restore_weights_on])
+            self.nnet.load_state_dict(best_weights[restore_weights_on], strict=False)
 
         return self._model, train_report
 
