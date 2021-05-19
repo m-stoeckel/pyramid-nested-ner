@@ -64,7 +64,7 @@ class LatexReporter(StringReporter):
                  '\t\\toprule\n'
 
         headers = ['Category', 'Precision', 'Recall', 'F1-Score', 'Support']
-        head_fmt = '{:<{name_width}}'
+        head_fmt = '\t{:<{name_width}}'
         head_fmt += ' & {:<{score_width}}' * 3
         head_fmt += ' & {:<{support_width}} \\\\'
         report += head_fmt.format(
