@@ -3,12 +3,12 @@ import json
 from pyramid_nested_ner.data import DataPoint
 
 
-class SentenceWindowDataPoint(DataPoint):
+class ContextWindowDataPoint(DataPoint):
 
     def __init__(self, text, entities=None, pre_data_points=None, post_data_points=None):
-        super(SentenceWindowDataPoint, self).__init__(text, entities)
-        self.pre_data_points = pre_data_points
-        self.post_data_points = post_data_points
+        super(ContextWindowDataPoint, self).__init__(text, entities)
+        self.preceding_data = pre_data_points
+        self.subsequent_data = post_data_points
 
     def _serialize(self):
         return {
@@ -22,8 +22,8 @@ class SentenceWindowDataPoint(DataPoint):
                 }
                 for entity in self.entities
             ],
-            'pre_data_points': [dp.serialize() for dp in self.pre_data_points],
-            'post_data_points': [dp.serialize() for dp in self.post_data_points]
+            'preceding_data': [dp.serialize() for dp in self.preceding_data],
+            'subsequent_data': [dp.serialize() for dp in self.subsequent_data]
         }
 
     def __str__(self):

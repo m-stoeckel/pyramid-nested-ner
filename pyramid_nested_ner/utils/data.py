@@ -6,7 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from pyramid_nested_ner.data import DataPoint, Entity
-from pyramid_nested_ner.data.contextualized import SentenceWindowDataPoint
+from pyramid_nested_ner.data.contextualized import ContextWindowDataPoint
 from pyramid_nested_ner.vectorizers.text.char import CharVectorizer
 
 
@@ -143,7 +143,7 @@ def wrg_sentence_window_reader(path, window_size=5):
         current = dataset.pop(0)
         post_buffer = dataset[:window_size]
 
-        yield SentenceWindowDataPoint(current.text, current.entities, pre_buffer, post_buffer)
+        yield ContextWindowDataPoint(current.text, current.entities, pre_buffer, post_buffer)
 
         while len(dataset) > 0:
             pre_buffer.append(current)
@@ -151,4 +151,4 @@ def wrg_sentence_window_reader(path, window_size=5):
             current = dataset.pop(0)
             post_buffer = dataset[:window_size]
 
-            yield SentenceWindowDataPoint(current.text, current.entities, pre_buffer[:], post_buffer[:])
+            yield ContextWindowDataPoint(current.text, current.entities, pre_buffer[:], post_buffer[:])
