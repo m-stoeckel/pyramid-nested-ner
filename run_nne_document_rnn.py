@@ -1,6 +1,6 @@
 import torch
 
-from pyramid_nested_ner.data.mutli_label_dataset import SentenceWindowsMultiLabelNerDataset as Dataset
+from pyramid_nested_ner.data.mutli_label_dataset import SentenceWindowMultiLabelNerDataset as Dataset
 from pyramid_nested_ner.mutli_label_model import DocumentRNNSentenceWindowPyramid as Pyramid
 from pyramid_nested_ner.training.multi_label_trainer import MultiLabelTrainer
 from pyramid_nested_ner.training.optim import get_default_sgd_optim

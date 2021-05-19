@@ -17,7 +17,11 @@ class SigmoidMultiLabelEncoder(PyramidLabelEncoder):
     def fit(self, entities):
         self.entities = list(sorted({entity for entity in entities}))
         self.entity_array = np.array(self.entities, dtype=str)
-        self.iob2_entities = [f'{iob2}-{entity}' for entity in self.entities for iob2 in 'IB' if entity]
+        self.iob2_entities = [
+            f'{iob2}-{entity}'
+            for entity in self.entities
+            for iob2 in 'BI' if entity
+        ]
 
     def _transform_layer(self, data, layer):
         y_layer = []

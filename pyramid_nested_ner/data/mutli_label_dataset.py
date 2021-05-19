@@ -1,7 +1,5 @@
 from typing import List
 
-import torch
-
 from pyramid_nested_ner.data.contextualized import ContextWindowDataPoint
 from pyramid_nested_ner.data.dataset import PyramidNerDataset
 from pyramid_nested_ner.vectorizers.labels.multi_label_encoder import SigmoidMultiLabelEncoder
@@ -18,23 +16,6 @@ class SigmoidMultiLabelNerDataset(PyramidNerDataset):
 
 
 class SentenceWindowMultiLabelNerDataset(SigmoidMultiLabelNerDataset):
-    def __getitem__(self, i):
-        if isinstance(i, int):
-            ids = torch.tensor([i])
-            sample = [self.data[i]]  # type: List[ContextWindowDataPoint]
-        else:
-            indices = torch.arange(len(self.data)).long()
-            sample = [self.data[index] for index in indices[i]]  # type: List[ContextWindowDataPoint]
-            ids = torch.tensor([index for index in indices[i]])
-
-        data = self._transform_x(sample)
-        max_depth = self.pyramid_max_depth
-        data['y'], data['y_remedy'] = self.label_encoder.transform(
-            sample, max_depth=max_depth)
-        data['id'] = ids.long()
-
-        return data
-
     def _transform_x(self, sample: List[ContextWindowDataPoint]):
         data: dict = super(SentenceWindowMultiLabelNerDataset, self)._transform_x(sample)
 
