@@ -7,7 +7,7 @@ from pyramid_nested_ner.mutli_label_model import DocumentRNNSentenceWindowPyrami
 from pyramid_nested_ner.training.multi_label_trainer import MultiLabelTrainer
 from pyramid_nested_ner.training.optim import get_default_sgd_optim
 from pyramid_nested_ner.utils.data import wrg_sentence_window_reader
-from run_nne_sigmoid import get_default_argparser, crc32_hex_dict, load_vocab, timestamp
+from run_nne_sigmoid import crc32_hex_dict, get_default_argparser, load_vocab, timestamp
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -56,7 +56,7 @@ def instantiate_datasets(lexicon, args: dict):
         char_vectorizer=True,
     ).get_dataloader(
         shuffle=False,
-        batch_size=args['batch_size'],
+        batch_size=args['eval_batch_size'],
         device=DEVICE,
         bucketing=args['bucketing']
     )
@@ -70,7 +70,7 @@ def instantiate_datasets(lexicon, args: dict):
         char_vectorizer=True,
     ).get_dataloader(
         shuffle=False,
-        batch_size=args['batch_size'],
+        batch_size=args['eval_batch_size'],
         device=DEVICE,
         bucketing=args['bucketing']
     )
@@ -151,13 +151,13 @@ if __name__ == '__main__':
     parser.add_argument('--sentence_window', type=int, default=5)
 
     # DocumentRNN args
-    parser.add_argument('--use_pre', default=True)
-    parser.add_argument('--use_post', default=False)
+    parser.add_argument('--use_pre', const=True, action='store_const', default=True)
+    parser.add_argument('--use_post', const=True, action='store_const', default=False)
     parser.add_argument('--hidden_size', type=int, default=128)
     parser.add_argument('--rnn_layers', type=int, default=1)
-    parser.add_argument('--reproject_words', type=bool, default=True)
+    parser.add_argument('--reproject_words', const=True, action='store_const', default=True)
     parser.add_argument('--reproject_words_dimension', type=int, default=None)
-    parser.add_argument('--bidirectional', type=bool, default=False)
+    parser.add_argument('--bidirectional', const=True, action='store_const', default=False)
     parser.add_argument('--dropout', type=float, default=0.5)
     parser.add_argument('--word_dropout', type=float, default=0.0)
     parser.add_argument('--locked_dropout', type=float, default=0.0)

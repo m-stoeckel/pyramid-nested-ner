@@ -74,7 +74,7 @@ def instantiate_datasets(lexicon, args: dict):
         char_vectorizer=True,
     ).get_dataloader(
         shuffle=False,
-        batch_size=args['batch_size'],
+        batch_size=args['eval_batch_size'],
         device=DEVICE,
         bucketing=args['bucketing']
     )
@@ -88,7 +88,7 @@ def instantiate_datasets(lexicon, args: dict):
         char_vectorizer=True,
     ).get_dataloader(
         shuffle=False,
-        batch_size=args['batch_size'],
+        batch_size=args['eval_batch_size'],
         device=DEVICE,
         bucketing=args['bucketing']
     )
@@ -160,8 +160,8 @@ def get_default_argparser():
     parser.add_argument('--classifier_type', type=str, default='linear',
                         choices=['linear', 'ovr_conv', 'ovr_multihead'])
     parser.add_argument('--restore_weights_on', type=str, default='loss')
-    parser.add_argument('--shuffle_train', type=bool, default=False)
-    parser.add_argument('--bucketing', type=bool, default=True)
+    parser.add_argument('--shuffle_train', const=True, action='store_const', default=False)
+    parser.add_argument('--bucketing', const=True, action='store_const', default=True)
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--patience', type=int, default=5)
     parser.add_argument('--char_embeddings_dim', type=int, default=60)
@@ -170,8 +170,9 @@ def get_default_argparser():
     parser.add_argument('--decoder_hidden_size', type=int, default=100)
     parser.add_argument('--pyramid_max_depth', type=int, default=8)
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--inverse_pyramid', default=False)
-    parser.add_argument('--custom_tokenizer', default=None)
+    parser.add_argument('--eval_batch_size', type=int, default=128)
+    parser.add_argument('--inverse_pyramid', const=True, action='store_const', default=False)
+    parser.add_argument('--custom_tokenizer', const=True, action='store_const', default=None)
     parser.add_argument('--decoder_dropout', type=float, default=0.4)
     parser.add_argument('--encoder_dropout', type=float, default=0.4)
     parser.add_argument('--grad_clip', type=float, default=5.0)
