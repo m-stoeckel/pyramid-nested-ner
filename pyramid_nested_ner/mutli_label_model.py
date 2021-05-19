@@ -5,7 +5,8 @@ from pyramid_nested_ner.model import PyramidNer
 from pyramid_nested_ner.modules.decoding.multi_label import ContextualOneVsRestConvDecoder, \
     ContextualOneVsRestMultiHeadDecoder, ContextualSigmoidLinearDecoder, \
     OneVsRestConvDecoder, OneVsRestMultiHeadDecoder, SigmoidLinearDecoder
-from pyramid_nested_ner.modules.encoding.contextual_encoder import DocumentRNNEncoder
+from pyramid_nested_ner.modules.encoding.contextual_encoder import ContextEncoder, DocumentRNNEncoder, \
+    SentenceTransformerEncoder
 from pyramid_nested_ner.vectorizers.labels.multi_label_encoder import SigmoidMultiLabelEncoder
 
 
@@ -38,7 +39,7 @@ class SigmoidMultiLabelPyramid(PyramidNer):
         return [self.remedy_to_classes(logit) for logit in logits]
 
 
-class DocumentRNNSentenceWindowPyramid(SigmoidMultiLabelPyramid):
+class ContextualMultiLabelPyramid(SigmoidMultiLabelPyramid):
     class ClassifierType(Enum):
         linear = ContextualSigmoidLinearDecoder
         ovr_conv = ContextualOneVsRestConvDecoder
@@ -46,7 +47,7 @@ class DocumentRNNSentenceWindowPyramid(SigmoidMultiLabelPyramid):
 
     class _Model(SigmoidMultiLabelPyramid._Model):
         def __init__(self, sentence_encoder, pyramid, context_encoder, classifier):
-            super(DocumentRNNSentenceWindowPyramid._Model, self).__init__(
+            super(ContextualMultiLabelPyramid._Model, self).__init__(
                 sentence_encoder,
                 pyramid,
                 classifier
@@ -69,7 +70,36 @@ class DocumentRNNSentenceWindowPyramid(SigmoidMultiLabelPyramid):
 
         def to(self, device, *args, **kwargs):
             self.context_encoder.to(device, *args, **kwargs)
-            super(DocumentRNNSentenceWindowPyramid._Model, self).to(device, *args, **kwargs)
+            super(ContextualMultiLabelPyramid._Model, self).to(device, *args, **kwargs)
+
+    def _init_nnet(self):
+        sentence_encoder = self._init_sentence_encoder()
+        pyramid_decoder = self._init_pyramid_decoder()
+
+        context_encoder = self._init_context_encoder()
+
+        decoder_output_size = self._model_args['decoder_hidden_size'] * 2 * (
+                1 + int(self._model_args['inverse_pyramid']))
+        decoder_output_size += context_encoder.embedding_dim
+
+        classifier = self._init_linear_decoder(decoder_output_size)
+        model = self._Model(sentence_encoder, pyramid_decoder, context_encoder, classifier)
+        model.to(self.device)
+        return model
+
+    def _init_linear_decoder(self, decoder_output_size):
+        classifier = self.classifier_cls(
+            decoder_output_size,
+            classes=len(self.label_encoder.entities)
+        )
+        classifier.to(self.device)
+        return classifier
+
+    def _init_context_encoder(self) -> ContextEncoder:
+        pass
+
+
+class DocumentRNNSentenceWindowPyramid(ContextualMultiLabelPyramid):
 
     def __init__(
             self,
@@ -114,22 +144,6 @@ class DocumentRNNSentenceWindowPyramid(SigmoidMultiLabelPyramid):
             **kwargs
         )
 
-    def _init_nnet(self):
-        sentence_encoder = self._init_sentence_encoder()
-        pyramid_decoder = self._init_pyramid_decoder()
-
-        context_encoder = self._init_context_encoder()
-
-        decoder_output_size = self._model_args['decoder_hidden_size'] * 2 * (
-                1 + int(self._model_args['inverse_pyramid']))
-        # TODO: account for contextual representation dim
-        decoder_output_size += context_encoder.embeddings.embedding_dim * context_encoder.directions
-
-        classifier = self._init_linear_decoder(decoder_output_size)
-        model = self._Model(sentence_encoder, pyramid_decoder, context_encoder, classifier)
-        model.to(self.device)
-        return model
-
     def _init_context_encoder(self):
         context_encoder = DocumentRNNEncoder(
             self._context_model_args['word_embeddings'],
@@ -151,10 +165,57 @@ class DocumentRNNSentenceWindowPyramid(SigmoidMultiLabelPyramid):
         context_encoder.to(self.device)
         return context_encoder
 
-    def _init_linear_decoder(self, decoder_output_size):
-        classifier = self.classifier_cls(
-            decoder_output_size,
-            classes=len(self.label_encoder.entities)
+
+class SentenceTransformerPyramid(ContextualMultiLabelPyramid):
+    def __init__(
+            self,
+            word_lexicon,
+            word_embeddings,
+            entities_lexicon,
+            model: str = "paraphrase-distilroberta-base-v1",
+            batch_size: int = 1,
+            embedding_encoder_type='rnn',
+            embedding_encoder_hidden_size=128,
+            encoder_type: str = 'identity',
+            transformer_encoder_output_size=64,
+            padding_idx=0,
+            casing=True,
+            use_pre=True,
+            use_post=False,
+            **kwargs
+    ):
+        self._context_model_args = {
+            'word_lexicon': word_lexicon,
+            'model': model,
+            'batch_size': batch_size,
+            'embedding_encoder_type': embedding_encoder_type,
+            'embedding_encoder_hidden_size': embedding_encoder_hidden_size,
+            'encoder_type': encoder_type,
+            'transformer_encoder_output_size': transformer_encoder_output_size,
+            'use_pre': use_pre,
+            'use_post': use_post,
+            'padding_idx': padding_idx,
+            'casing': casing
+        }
+        super(SentenceTransformerPyramid, self).__init__(
+            word_lexicon,
+            word_embeddings,
+            entities_lexicon,
+            **kwargs
         )
-        classifier.to(self.device)
-        return classifier
+
+    def _init_context_encoder(self) -> ContextEncoder:
+        return SentenceTransformerEncoder(
+            self._context_model_args['word_lexicon'],
+            model=self._context_model_args['model'],
+            batch_size=self._context_model_args['batch_size'],
+            embedding_encoder_type=self._context_model_args['embedding_encoder_type'],
+            embedding_encoder_hidden_size=self._context_model_args['embedding_encoder_hidden_size'],
+            encoder_type=self._context_model_args['encoder_type'],
+            encoder_output_size=self._context_model_args['transformer_encoder_output_size'],
+            padding_idx=self._context_model_args['padding_idx'],
+            casing=self._context_model_args['casing'],
+            use_pre=self._context_model_args['use_pre'],
+            use_post=self._context_model_args['use_post'],
+            device=self.device
+        )
