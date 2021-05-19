@@ -152,3 +152,29 @@ def wrg_sentence_window_reader(path, window_size=5):
             post_buffer = dataset[:window_size]
 
             yield ContextWindowDataPoint(current.text, current.entities, pre_buffer[:], post_buffer[:])
+
+
+def get_token_window(token_lists, window_size):
+    return list(itertools.islice((token for token_list in token_lists for token in token_list), window_size))
+
+
+def wrg_token_window_reader(path, window_size=64, tokenizer=lambda text: text.strip().split()):
+    path = Path(path)
+    for file in path.iterdir():
+        dataset = list(wrg_reader(str(file.absolute())))
+        tokenized_sentences = [tokenizer(data_point.text) for data_point in dataset]
+
+        pre_buffer = []
+        while len(dataset) > 0:
+            current_dp, current_tokens = dataset.pop(0), tokenized_sentences.pop(0)
+            post_buffer = get_token_window(tokenized_sentences, window_size)
+
+            yield ContextWindowDataPoint(
+                current_dp.text,
+                current_dp.entities,
+                DataPoint(" ".join(pre_buffer[:])),
+                DataPoint(" ".join(post_buffer[:]))
+            )
+
+            pre_buffer.extend(current_tokens)
+            pre_buffer = pre_buffer[-window_size:]

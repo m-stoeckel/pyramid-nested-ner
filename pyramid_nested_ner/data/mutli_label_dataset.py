@@ -49,3 +49,22 @@ class SentenceWindowMultiLabelNerDataset(SigmoidMultiLabelNerDataset):
         ]
 
         return data
+
+
+class TokenWindowMultiLabelNerDataset(SigmoidMultiLabelNerDataset):
+    def _transform_x(self, sample: List[ContextWindowDataPoint]):
+        data: dict = super(TokenWindowMultiLabelNerDataset, self)._transform_x(sample)
+
+        data['pre_word_vectors'], data['pre_word_masks'] = self.word_vectorizer.pad_sequences(
+            self.word_vectorizer.transform(
+                [data_point.preceding_data for data_point in sample]
+            )
+        )
+
+        data['post_word_vectors'], data['post_word_masks'] = self.word_vectorizer.pad_sequences(
+            self.word_vectorizer.transform(
+                [data_point.subsequent_data for data_point in sample]
+            )
+        )
+
+        return data
