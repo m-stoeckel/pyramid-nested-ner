@@ -140,13 +140,18 @@ def run_training(args: dict):
 
     formatted_report = trainer.test_model(test_data, out_dict=False)
     print(formatted_report)
+    write_report(args, train_report, formatted_report)
+
+
+def write_report(args, train_report, formatted_report):
+    print(formatted_report)
     with open(f"report_{crc32_hex_dict(args)}_{timestamp()}.json", 'w') as fp:
         fp.write(json.dumps(
             {
                 'model_name': Pyramid.__name__,
                 'dataset_name': Dataset.__name__,
                 'args': args,
-                'train_report': train_report.report.to_dict(),
+                'train_report': train_report.report.to_dict()
             }, indent=2
         ))
     with open(f"report_{crc32_hex_dict(args)}_{timestamp()}.tex", 'w') as fp:

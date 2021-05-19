@@ -1,13 +1,10 @@
-import json
-
 import torch
 
-from pyramid_nested_ner.data.mutli_label_dataset import SentenceWindowsMultiLabelNerDataset as Dataset
 from pyramid_nested_ner.mutli_label_model import SentenceTransformerPyramid as Pyramid
 from pyramid_nested_ner.training.multi_label_trainer import MultiLabelTrainer
 from pyramid_nested_ner.training.optim import get_default_sgd_optim
 from run_nne_document_rnn import instantiate_datasets
-from run_nne_sigmoid import crc32_hex_dict, get_default_argparser, load_vocab, timestamp
+from run_nne_sigmoid import get_default_argparser, load_vocab, write_report
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -66,17 +63,7 @@ def run_training(args: dict):
     train_report.plot_custom_report('micro_f1')
 
     formatted_report = trainer.test_model(test_data, out_dict=False)
-    print(formatted_report)
-    with open(f"report_{crc32_hex_dict(args)}_{timestamp()}.json", 'w') as fp:
-        fp.write(json.dumps(
-            {
-                'model_name': Pyramid.__name__,
-                'dataset_name': Dataset.__name__,
-                'args': args,
-                'train_report': train_report.report.to_dict(),
-                'formatted_report': formatted_report,
-            }
-        ))
+    write_report(args, train_report, formatted_report)
 
 
 if __name__ == '__main__':
