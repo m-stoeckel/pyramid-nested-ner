@@ -4,7 +4,7 @@ import torch
 from torch import nn as nn
 
 from pyramid_nested_ner.modules.word_embeddings.document_embeddings import DocumentRNNEmbeddings, \
-    SentenceTransformerEmbeddings
+    PooledSentenceTransformerEmbeddings
 
 
 class IdentityEncoder(nn.Module):
@@ -22,7 +22,7 @@ class LinearEncoder(nn.Module):
 
 
 class ContextEncoder(nn.Module):
-    embeddings: Union[DocumentRNNEmbeddings, SentenceTransformerEmbeddings]
+    embeddings: Union[DocumentRNNEmbeddings, PooledSentenceTransformerEmbeddings]
 
     def __init__(
             self,
@@ -82,7 +82,9 @@ class ContextEncoder(nn.Module):
     def forward(
             self,
             pre_word_vectors,
-            post_word_vectors
+            post_word_vectors,
+            pre_word_masks=None,
+            post_word_masks=None
     ):
         if self.use_pre and self.use_post:
             output = torch.cat((
@@ -95,6 +97,7 @@ class ContextEncoder(nn.Module):
             output = self.embeddings(pre_word_vectors)
 
         return self.encoder(output)
+
 
 class DocumentRNNEncoder(ContextEncoder):
 
@@ -166,7 +169,7 @@ class SentenceTransformerEncoder(ContextEncoder):
             lexicon,
             model: str = "paraphrase-distilroberta-base-v1",
             batch_size: int = 1,
-            embedding_encoder_type='rnn',
+            embedding_encoder_type='mean',
             embedding_encoder_hidden_size=128,
             encoder_type: str = 'identity',
             encoder_output_size=64,
@@ -194,7 +197,7 @@ class SentenceTransformerEncoder(ContextEncoder):
         )
 
     def _init_embeddings(self):
-        self.embeddings = SentenceTransformerEmbeddings(
+        self.embeddings = PooledSentenceTransformerEmbeddings(
             self._embeddings_args['lexicon'],
             model=self._embeddings_args['model'],
             batch_size=self._embeddings_args['batch_size'],

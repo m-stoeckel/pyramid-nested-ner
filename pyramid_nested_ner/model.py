@@ -25,7 +25,12 @@ class PyramidNer(object):
             self.classifier = classifier
 
         def forward(self, *args, **kwargs):
-            x, mask = self.encoder(*args, **kwargs)
+            x, mask = self.encoder(
+                kwargs['word_vectors'],
+                kwargs['word_mask'],
+                kwargs.get('char_vectors'),
+                kwargs.get('char_mask')
+            )
             h, h_remedy = self.pyramid(x, mask)
             return self.classifier(h, h_remedy)
 

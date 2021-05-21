@@ -16,7 +16,8 @@ class SigmoidMultiLabelPyramid(PyramidNer):
         ovr_conv = OneVsRestConvDecoder
         ovr_multihead = OneVsRestMultiHeadDecoder
 
-    def __init__(self, *args, classifier_type='linear', **kwargs):
+    def __init__(self, *args, classifier_type='linear', dropout=0.4, **kwargs):
+        self.dropout = dropout
         self.classifier_cls = self.ClassifierType[classifier_type].value
         super(SigmoidMultiLabelPyramid, self).__init__(*args, **kwargs)
 
@@ -64,7 +65,9 @@ class ContextualMultiLabelPyramid(SigmoidMultiLabelPyramid):
             h, h_remedy = self.pyramid(x, mask)
             x_context = self.context_encoder(
                 kwargs.get('pre_word_vectors'),
-                kwargs.get('post_word_vectors')
+                kwargs.get('post_word_vectors'),
+                kwargs.get('pre_word_masks'),
+                kwargs.get('post_word_masks')
             )
             return self.classifier(h, x_context, h_remedy)
 
@@ -166,7 +169,7 @@ class DocumentRNNSentenceWindowPyramid(ContextualMultiLabelPyramid):
         return context_encoder
 
 
-class SentenceTransformerPyramid(ContextualMultiLabelPyramid):
+class PooledSentenceTransformerPyramid(ContextualMultiLabelPyramid):
     def __init__(
             self,
             word_lexicon,
@@ -174,7 +177,7 @@ class SentenceTransformerPyramid(ContextualMultiLabelPyramid):
             entities_lexicon,
             model: str = "paraphrase-distilroberta-base-v1",
             batch_size: int = 1,
-            embedding_encoder_type='rnn',
+            embedding_encoder_type='mean',
             embedding_encoder_hidden_size=128,
             encoder_type: str = 'identity',
             transformer_encoder_output_size=64,
@@ -197,7 +200,7 @@ class SentenceTransformerPyramid(ContextualMultiLabelPyramid):
             'padding_idx': padding_idx,
             'casing': casing
         }
-        super(SentenceTransformerPyramid, self).__init__(
+        super(PooledSentenceTransformerPyramid, self).__init__(
             word_lexicon,
             word_embeddings,
             entities_lexicon,

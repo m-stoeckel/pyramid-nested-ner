@@ -1,6 +1,6 @@
 import torch
 
-from pyramid_nested_ner.mutli_label_model import SentenceTransformerPyramid as Pyramid
+from pyramid_nested_ner.mutli_label_model import PooledSentenceTransformerPyramid as Pyramid
 from pyramid_nested_ner.training.multi_label_trainer import MultiLabelTrainer
 from pyramid_nested_ner.training.optim import get_default_sgd_optim
 from run_nne_document_rnn import instantiate_datasets
@@ -72,7 +72,7 @@ if __name__ == '__main__':
     # wrg_sentence_window_reader args
     parser.add_argument('--sentence_window', type=int, default=5)
 
-    # SentenceTransformerPyramid args
+    # PooledSentenceTransformerPyramid args
     parser.add_argument('--model', type=str, default="paraphrase-distilroberta-base-v1")
     parser.add_argument('--transformer_batch_size', type=int, default=1)
     parser.add_argument('--transformer_embedding_encoder_type', default='rnn')

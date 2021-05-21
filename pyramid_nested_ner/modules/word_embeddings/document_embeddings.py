@@ -1,9 +1,10 @@
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import flair
 import flair.embeddings
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from flair.embeddings import WordEmbeddings
 from torch.nn.utils.rnn import pad_sequence
 
@@ -23,15 +24,19 @@ class DocumentEmbeddings(nn.Module):
             padding_idx=0,
             casing=True,
             device='cpu',
-
+            requires_grad=False
     ):
         super(DocumentEmbeddings, self).__init__()
         self.lexicon = lexicon
         self.pad_index = padding_idx
         self.casing = casing
         self.device = device
+        self.requires_grad = requires_grad
+
+        self.vocab_idx = {i: token.lower() if not self.casing else token for i, token in enumerate(self.lexicon)}
 
         self._cache = {}
+        self._train = False
 
     def to(self, device, *args, **kwargs):
         self.device = device
@@ -39,28 +44,64 @@ class DocumentEmbeddings(nn.Module):
         return self
 
     def train(self, mode=True):
+        self._train = mode
         self.embeddings.train(mode)
 
     def eval(self):
+        self._train = False
         self.embeddings.train(False)
 
-    @property
-    def vocab_idx(self):
-        return {i: token.lower() if not self.casing else token for i, token in enumerate(self.lexicon)}
+    def _generate_cache_key(self, index_sequence):
+        return " ".join(str(index) for index in index_sequence)
 
-    def _tensor_to_cache_key(self, ltensor):
-        cache_key = " ".join(
-            [str(value.item()) for tensor in ltensor for value in tensor.cpu().clone().detach()]
-        )
-        return cache_key
+    def _generate_index_sequence_embedding(self, index_sequence):
+        flair_sentence = flair.data.Sentence()
+        for index in index_sequence:
+            token = self.vocab_idx.get(index, '[UNK]')
+            flair_sentence.add_token(token)
 
-    def _get_from_cache(self, key):
-        key = self._tensor_to_cache_key(key)
-        return self._cache.get(key)
+        if not len(flair_sentence.tokens):
+            return torch.zeros(self.embedding_dim, requires_grad=self.requires_grad)
 
-    def _add_to_cache(self, key, value):
-        key = self._tensor_to_cache_key(key)
-        self._cache[key] = value.cpu()
+        self.embeddings.embed(flair_sentence)
+        return flair_sentence.get_embedding()
+
+    def _get_index_sequence_embedding(self, index_sequence):
+        cache_key = self._generate_cache_key(index_sequence)
+        if self._cache.get(cache_key) is None:
+            sentence_embedding = self._generate_index_sequence_embedding(index_sequence)
+            self._cache[cache_key] = sentence_embedding
+        else:
+            sentence_embedding = self._cache.get(cache_key).clone().detach().requires_grad_(self.requires_grad)
+        return sentence_embedding
+
+    def _embed_list_of_sequences(self, batch: List[List[torch.Tensor]]):
+        embeddings = []
+        for sequences in batch:
+            index_sequence = [
+                index.item()
+                for sequence in sequences
+                for index in sequence.cpu().clone().detach()
+                if index.item() != self.pad_index
+            ]
+
+            sentence_embedding = self._get_index_sequence_embedding(index_sequence)
+
+            embeddings.append(sentence_embedding.to(self.device))
+        return torch.stack(embeddings).to(self.device)
+
+    def _embed_list_of_tensors(self, batch: List[torch.Tensor]):
+        embeddings = []
+        for sequence in batch:
+            index_sequence = [
+                index.item()
+                for index in sequence.cpu().clone().detach()
+                if index.item() != self.pad_index
+            ]
+            sentence_embedding = self._get_index_sequence_embedding(index_sequence)
+
+            embeddings.append(sentence_embedding.to(self.device))
+        return torch.stack(embeddings).to(self.device)
 
 
 class DocumentRNNEmbeddings(DocumentEmbeddings):
@@ -94,6 +135,7 @@ class DocumentRNNEmbeddings(DocumentEmbeddings):
             padding_idx=padding_idx,
             casing=casing,
             device=device,
+            requires_grad=True
         )
         embeddings = [embeddings] if isinstance(embeddings, str) else embeddings
         embeddings = [WordEmbeddings(emb) for emb in embeddings]
@@ -114,31 +156,11 @@ class DocumentRNNEmbeddings(DocumentEmbeddings):
         self.embedding_dim = self.embeddings.embedding_length
         self.embeddings.to(device)
 
-    def forward(self, x: torch.Tensor):
-        vocab_idx = self.vocab_idx
-        embeddings = []
-        for sequences in x:
-            if self._get_from_cache(sequences) is None:
-                flair_sentence = flair.data.Sentence()
-                for sequence in sequences:
-                    for index in sequence:
-                        index = index.item()
-                        if index == self.pad_index:
-                            break  # skip padding
-                        token = vocab_idx.get(index, '[UNK]')
-                        flair_sentence.add_token(token)
-                if len(flair_sentence.tokens):
-                    self.embeddings.embed(flair_sentence)
-                    sentence_embedding = flair_sentence.get_embedding()
-                else:
-                    sentence_embedding = torch.zeros(self.embedding_dim, requires_grad=True)
-                self._add_to_cache(sequences, sentence_embedding)
-            else:
-                sentence_embedding = self._get_from_cache(sequences).clone().detach().requires_grad_(True)
-            sentence_embedding = sentence_embedding.to(self.device)
-            embeddings.append(sentence_embedding)
-
-        return torch.stack(embeddings).to(self.device)
+    def forward(self, batch: Union[List[torch.Tensor], List[List[torch.Tensor]]]):
+        if isinstance(batch[0], list):
+            return self._embed_list_of_sequences(batch)
+        else:
+            return self._embed_list_of_tensors(batch)
 
 
 class MaxPooler(nn.Module):
@@ -159,10 +181,11 @@ class MeanPooler(nn.Module):
         return x
 
 
-class SentenceTransformerEmbeddings(DocumentEmbeddings):
+class PooledSentenceTransformerEmbeddings(DocumentEmbeddings):
     def __init__(
             self,
             lexicon,
+            dropout=0.5,
             model: str = "paraphrase-distilroberta-base-v1",
             batch_size: int = 1,
             embedding_encoder_type='mean',
@@ -170,7 +193,7 @@ class SentenceTransformerEmbeddings(DocumentEmbeddings):
             casing=True,
             device='cpu',
     ):
-        super(SentenceTransformerEmbeddings, self).__init__(
+        super(PooledSentenceTransformerEmbeddings, self).__init__(
             lexicon=lexicon,
             padding_idx=padding_idx,
             casing=casing,
@@ -180,6 +203,7 @@ class SentenceTransformerEmbeddings(DocumentEmbeddings):
             model=model,
             batch_size=batch_size
         )
+        self.dropout = dropout or 0.0
 
         self.embedding_encoder_type = embedding_encoder_type
         if embedding_encoder_type == 'max':
@@ -191,58 +215,42 @@ class SentenceTransformerEmbeddings(DocumentEmbeddings):
 
         self.embedding_dim = self.embeddings.embedding_length
 
-    def _tensor_to_cache_key(self, tensor):
-        cache_key = " ".join(
-            [str(value.item()) for value in tensor.cpu().clone().detach()]
-        )
-        return cache_key
-
-    def to(self, device, *args, **kwargs):
-        if self.embedding_encoder_type == 'rnn':
-            self.encoder.to(device, *args, **kwargs)
-        return self
-
-    def _embed(self, x):
-        vocab_idx = self.vocab_idx
+    def _embed_list_of_sequences(self, batch: List[List[torch.Tensor]]):
         embeddings = []
-        for sequences in x:
+        for sequences in batch:
             sequence_embeddings = []
             for sequence in sequences:
-                if self._get_from_cache(sequence) is None:
-                    flair_sentence = flair.data.Sentence()
-                    for index in sequence:
-                        index = index.item()
-                        if index == self.pad_index:
-                            break  # skip padding
-                        token = vocab_idx.get(index, '[UNK]')
-                        flair_sentence.add_token(token)
-                    if len(flair_sentence.tokens):
-                        self.embeddings.embed(flair_sentence)
-                        sentence_embedding = flair_sentence.get_embedding()
-                    else:
-                        sentence_embedding = torch.zeros(self.embeddings.embedding_length, requires_grad=False)
-                    self._add_to_cache(sequence, sentence_embedding)
-                else:
-                    sentence_embedding = self._get_from_cache(sequence).clone().detach()
-                sentence_embedding = sentence_embedding.to(self.device)
+                index_sequence = [
+                    index.item()
+                    for index in sequence.cpu().clone().detach()
+                    if index.item() != self.pad_index
+                ]
+
+                sentence_embedding = self._get_index_sequence_embedding(index_sequence).to(self.device)
                 sequence_embeddings.append(sentence_embedding)
 
             if sequence_embeddings:
                 sequence_embeddings = self.encoder(torch.stack(sequence_embeddings, 0))
             else:
-                sequence_embeddings = torch.zeros(self.embedding_dim, requires_grad=False)
+                sequence_embeddings = torch.zeros(self.embedding_dim, requires_grad=False, device=self.device)
 
             embeddings.append(sequence_embeddings)
         return torch.stack(embeddings).to(self.device)
 
-    def forward(self, x: torch.Tensor):
-        return self._embed(x)
+    def forward(self, x: Union[torch.Tensor, List[torch.Tensor], List[List[torch.Tensor]]]):
+        if isinstance(x[0], list):
+            embeddings = self._embed_list_of_sequences(x)
+        else:
+            embeddings = self._embed_list_of_tensors(x)
+
+        return F.dropout(embeddings, self.dropout, training=self._train)
 
 
-class SentenceRNNTransformerEmbeddings(SentenceTransformerEmbeddings):
+class RNNSentenceTransformerEmbeddings(PooledSentenceTransformerEmbeddings):
     def __init__(
             self,
             lexicon,
+            dropout=0.5,
             model: str = "paraphrase-distilroberta-base-v1",
             batch_size: int = 1,
             rnn_style='lstm',
@@ -253,8 +261,9 @@ class SentenceRNNTransformerEmbeddings(SentenceTransformerEmbeddings):
             casing=True,
             device='cpu',
     ):
-        super(SentenceRNNTransformerEmbeddings, self).__init__(
+        super(RNNSentenceTransformerEmbeddings, self).__init__(
             lexicon=lexicon,
+            dropout=dropout,
             padding_idx=padding_idx,
             casing=casing,
             device=device
@@ -283,26 +292,41 @@ class SentenceRNNTransformerEmbeddings(SentenceTransformerEmbeddings):
             self.encoder = nn.Linear(self.rnn.hidden_size, embedding_encoder_hidden_size)
             self.embedding_dim = embedding_encoder_hidden_size
 
-    def _tensor_to_cache_key(self, tensor):
-        cache_key = " ".join(
-            [str(value.item()) for value in tensor.cpu().clone().detach()]
+    def _embed_list_of_sequences(self, batch: List[List[torch.Tensor]]) -> List[torch.Tensor]:
+        embeddings = []
+        for sequences in batch:
+            sequence_embeddings = []
+            for sequence in sequences:
+                index_sequence = [
+                    index.item()
+                    for index in sequence.cpu().clone().detach()
+                    if index.item() != self.pad_index
+                ]
+
+                sentence_embedding = self._get_index_sequence_embedding(index_sequence)
+                sequence_embeddings.append(sentence_embedding.to(self.device))
+            embeddings.append(torch.stack(sequence_embeddings))
+        return embeddings
+
+    def forward(self, x: List[List[torch.Tensor]]):
+        # Variable length sentence embeddings as a list of tensors
+        embeddings: List[torch.Tensor] = self._embed_list_of_sequences(x)
+
+        mask = pad_sequence(
+            [torch.ones(sequence.size(0), dtype=torch.int8) for sequence in embeddings],
+            batch_first=True
         )
-        return cache_key
-
-    def forward(self, x: torch.Tensor):
-        embeddings = self._embed(x)
-
-        mask = pad_sequence([torch.ones(sequence.size(0), dtype=torch.int8) for sequence in embeddings],
-                            batch_first=True)
-        embeddings = pad_sequence(embeddings, batch_first=True).to(self.device)
+        embeddings: torch.Tensor = pad_sequence(embeddings, batch_first=True).to(self.device)
         h, (hn, _) = self.rnn(embeddings, mask)
 
         if self.embedding_encoder_type == 'hidden':
-            return hn.squeeze(0)
+            embeddings = hn.squeeze(0)
         elif self.embedding_encoder_type == 'linear':
-            return self.encoder(hn.squeeze(0))
+            embeddings: torch.Tensor = self.encoder(hn.squeeze(0))
         else:
-            return self.encoder(h)
+            embeddings: torch.Tensor = self.encoder(h)
+
+        return F.dropout(embeddings, self.dropout, training=self._train)
 
     def to(self, device, *args, **kwargs):
         if self.embedding_encoder_type == 'rnn':
