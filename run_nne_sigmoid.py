@@ -139,12 +139,15 @@ def run_training(args: dict):
     train_report.plot_custom_report('micro_f1')
 
     formatted_report = trainer.test_model(test_data, out_dict=False)
-    print(formatted_report)
     write_report(args, train_report, formatted_report)
 
 
 def write_report(args, train_report, formatted_report):
     print(formatted_report)
+    args.update({
+        'model_name': Pyramid.__name__,
+        'dataset_name': Dataset.__name__
+    })
     with open(f"report_{crc32_hex_dict(args)}_{timestamp()}.json", 'w') as fp:
         fp.write(json.dumps(
             {
@@ -160,7 +163,7 @@ def write_report(args, train_report, formatted_report):
 
 def get_default_argparser():
     parser = argparse.ArgumentParser(description='Run training')
-    parser.add_argument('--word_embeddings', type=str, nargs='+', default=['en-glove', 'en-crawl'])
+    parser.add_argument('--word_embeddings', type=str, nargs='+', default=['en-glove'])
     parser.add_argument('--language_model', type=str, default=None)
     parser.add_argument('--classifier_type', type=str, default='linear',
                         choices=['linear', 'ovr_conv', 'ovr_multihead'])
