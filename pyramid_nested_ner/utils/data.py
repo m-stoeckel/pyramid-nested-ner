@@ -178,3 +178,29 @@ def wrg_token_window_reader(path, window_size=64, tokenizer=lambda text: text.st
 
             pre_buffer.extend(current_tokens)
             pre_buffer = pre_buffer[-window_size:]
+
+
+def simple_wrg_reader(path):
+    with open(path, 'r') as fp:
+        lines = fp.readlines()
+
+    for idx in range(0, len(lines), 4):
+        text, pos, tags = lines[idx:idx + 3]
+        text, pos, tags = text.strip(), pos.strip(), tags.strip()
+
+        entities = []
+        if len(tags) > 0:
+            for tag in tags.split("|"):
+                offsets, category = tag.split()
+                start, end = offsets.split(",")
+                entities.append(
+                    {
+                        'entity_type': category,
+                        'span': [int(start), int(end) + 1]
+                    }
+                )
+
+        yield {
+            'tokens': list(text.split()),
+            'entities': entities
+        }

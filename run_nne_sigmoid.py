@@ -111,7 +111,6 @@ def run_training(args: dict):
         language_model=args['language_model'],
         char_embeddings_dim=args['char_embeddings_dim'],
         encoder_hidden_size=args['encoder_hidden_size'],
-        encoder_output_size=args['encoder_output_size'],
         decoder_hidden_size=args['decoder_hidden_size'],
         inverse_pyramid=args['inverse_pyramid'],
         custom_tokenizer=args['custom_tokenizer'],
@@ -171,10 +170,14 @@ def get_default_argparser():
     parser.add_argument('--shuffle_train', const=True, action='store_const', default=False)
     parser.add_argument('--bucketing', const=True, action='store_const', default=True)
     parser.add_argument('--epochs', type=int, default=100)
+
+    parser.add_argument('--lr', type=float, default=1e-2)
+    parser.add_argument('--momentum', type=float, default=0.9)
+    parser.add_argument('--inverse_time_lr_decay', const=True, action='store_const', default=True)
+
     parser.add_argument('--patience', type=int, default=5)
     parser.add_argument('--char_embeddings_dim', type=int, default=60)
     parser.add_argument('--encoder_hidden_size', type=int, default=100)
-    parser.add_argument('--encoder_output_size', type=int, default=200)
     parser.add_argument('--decoder_hidden_size', type=int, default=100)
     parser.add_argument('--pyramid_max_depth', type=int, default=8)
     parser.add_argument('--batch_size', type=int, default=64)

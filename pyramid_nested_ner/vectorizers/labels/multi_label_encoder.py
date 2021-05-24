@@ -51,43 +51,6 @@ class SigmoidMultiLabelEncoder(PyramidLabelEncoder):
 
             yield bitmap
 
-    # def _remedy_solution_bitmap(self, data_point, order):
-    #     remedy_solution_bitmap = list()
-    #     for i, ngram in enumerate(self._ngrams(data_point.text, order)):
-    #         ngram_start = i
-    #         ngram_stop = i + len(ngram)
-    #         # Multi Label Bitmap: num(classes) × num(labels) = num(classes) × 2
-    #         ngram_bitmap = torch.zeros((len(self.entities) - 1) * 2)
-    #         for entity in data_point.entities:
-    #             entity_start = len(self.tokenize(data_point.text[:entity.start]))
-    #             entity_stop = entity_start + len(self.tokenize(entity.value))
-    #             if ngram_start >= entity_start and ngram_stop <= entity_stop:
-    #                 index = self.entities.index(entity.name)
-    #                 # current n-gram is inside an entity span:
-    #                 if entity_start == ngram_start:
-    #                     ngram_bitmap[index * 2] = 1
-    #                 elif ngram_stop <= entity_stop:
-    #                     ngram_bitmap[index * 2 + 1] = 1
-    #                 else:
-    #                     raise AssertionError(" ")
-    #         remedy_solution_bitmap.append(torch.flatten(ngram_bitmap.clone()))
-    #     if remedy_solution_bitmap:
-    #         return torch.stack(remedy_solution_bitmap)
-    #     return torch.tensor([])
-    #
-    # def _remedy_encoding_transform(self, data, order):
-    #     y_layer = list()
-    #     for x in (data if isinstance(data, list) else [data]):
-    #         y_layer.append(self._remedy_solution_bitmap(x, order))
-    #     try:
-    #         return pad_sequence(y_layer, batch_first=True)
-    #     except RuntimeError:
-    #         # pad_sequence can crash if some sequences in `data` are shorter than the number of lay-
-    #         # ers and therefore their encoding yields an empty tensor, while other sequences are tr-
-    #         # ansformed into tensors of shape (n, |entities| * 2).
-    #         y_layer = [y if y.numel() else torch.zeros(1, (len(self.entities) - 1) * 2) for y in y_layer]
-    #         return pad_sequence(y_layer, batch_first=True)
-
     def _inverse_layer_transform(self, y_layer):
         return [
             [

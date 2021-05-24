@@ -153,8 +153,11 @@ class DocumentRNNEmbeddings(DocumentEmbeddings):
             word_dropout=word_dropout,
             locked_dropout=locked_dropout
         )
-        self.embedding_dim = self.embeddings.embedding_length
+        self.embedding_dim: int = self.embeddings.embedding_length
         self.embeddings.to(device)
+
+    def _get_index_sequence_embedding(self, index_sequence):
+        return self._generate_index_sequence_embedding(index_sequence)
 
     def forward(self, batch: Union[List[torch.Tensor], List[List[torch.Tensor]]]):
         if isinstance(batch[0], list):
@@ -188,7 +191,7 @@ class PooledSentenceTransformerEmbeddings(DocumentEmbeddings):
             dropout=0.5,
             model: str = "paraphrase-distilroberta-base-v1",
             batch_size: int = 1,
-            embedding_encoder_type='mean',
+            embedding_pooling_method='mean',
             padding_idx=0,
             casing=True,
             device='cpu',
@@ -205,10 +208,9 @@ class PooledSentenceTransformerEmbeddings(DocumentEmbeddings):
         )
         self.dropout = dropout or 0.0
 
-        self.embedding_encoder_type = embedding_encoder_type
-        if embedding_encoder_type == 'max':
+        if embedding_pooling_method == 'max':
             self.encoder = MaxPooler()
-        elif embedding_encoder_type == 'min':
+        elif embedding_pooling_method == 'min':
             self.encoder = MinPooler()
         else:
             self.encoder = MeanPooler()
@@ -255,7 +257,7 @@ class RNNSentenceTransformerEmbeddings(PooledSentenceTransformerEmbeddings):
             batch_size: int = 1,
             rnn_style='lstm',
             rnn_hidden_size=128,
-            embedding_encoder_type='linear',
+            embedding_pooling_method='linear',
             embedding_encoder_hidden_size=128,
             padding_idx=0,
             casing=True,
@@ -280,15 +282,15 @@ class RNNSentenceTransformerEmbeddings(PooledSentenceTransformerEmbeddings):
         )
         self.embedding_dim = rnn_hidden_size
 
-        self.embedding_encoder_type = embedding_encoder_type
+        self.embedding_encoder_type = embedding_pooling_method
         self.embedding_encoder_hidden_size = embedding_encoder_hidden_size
-        if embedding_encoder_type == 'max':
+        if embedding_pooling_method == 'max':
             self.encoder = MaxPooler()
-        elif embedding_encoder_type == 'min':
+        elif embedding_pooling_method == 'min':
             self.encoder = MinPooler()
-        elif embedding_encoder_type == 'mean':
+        elif embedding_pooling_method == 'mean':
             self.encoder = MeanPooler()
-        elif embedding_encoder_type == 'linear':
+        elif embedding_pooling_method == 'linear':
             self.encoder = nn.Linear(self.rnn.hidden_size, embedding_encoder_hidden_size)
             self.embedding_dim = embedding_encoder_hidden_size
 

@@ -91,7 +91,8 @@ def run_training(args: dict):
         language_model=args['language_model'],
         char_embeddings_dim=args['char_embeddings_dim'],
         encoder_hidden_size=args['encoder_hidden_size'],
-        encoder_output_size=args['encoder_output_size'],
+        embedding_encoder_type=args['embedding_encoder_type'],
+        embedding_encoder_output_size=args['embedding_encoder_output_size'],
         decoder_hidden_size=args['decoder_hidden_size'],
         inverse_pyramid=args['inverse_pyramid'],
         custom_tokenizer=args['custom_tokenizer'],
@@ -137,12 +138,14 @@ if __name__ == '__main__':
 
     # wrg_sentence_window_reader args
     parser.add_argument('--sentence_window', type=int, default=5)
-
-    # DocumentRNN args
     parser.add_argument('--use_pre', const=True, action='store_const', default=True)
     parser.add_argument('--use_post', const=True, action='store_const', default=False)
+
+    # DocumentRNN args
     parser.add_argument('--hidden_size', type=int, default=128)
     parser.add_argument('--rnn_layers', type=int, default=1)
+    parser.add_argument('--embedding_encoder_type', type=str, default='linear')
+    parser.add_argument('--embedding_encoder_output_size', default=128)
     parser.add_argument('--reproject_words', const=True, action='store_const', default=True)
     parser.add_argument('--reproject_words_dimension', type=int, default=None)
     parser.add_argument('--bidirectional', const=True, action='store_const', default=False)

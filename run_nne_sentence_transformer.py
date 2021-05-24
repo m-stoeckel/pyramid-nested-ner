@@ -25,7 +25,6 @@ def run_training(args: dict):
         language_model=args['language_model'],
         char_embeddings_dim=args['char_embeddings_dim'],
         encoder_hidden_size=args['encoder_hidden_size'],
-        encoder_output_size=args['encoder_output_size'],
         decoder_hidden_size=args['decoder_hidden_size'],
         inverse_pyramid=args['inverse_pyramid'],
         custom_tokenizer=args['custom_tokenizer'],
@@ -34,10 +33,9 @@ def run_training(args: dict):
         encoder_dropout=args['encoder_dropout'],
         model=args['model'],
         batch_size=args['transformer_batch_size'],
-        embedding_encoder_type=args['transformer_embedding_encoder_type'],
-        embedding_encoder_hidden_size=args['transformer_embedding_encoder_hidden_size'],
-        encoder_type=args['encoder_type'],
-        transformer_encoder_output_size=args['transformer_encoder_output_size'],
+        embedding_pooling_method=args['transformer_embedding_encoder_type'],
+        embedding_encoder_type=args['embedding_encoder_type'],
+        embedding_encoder_output_size=args['embedding_encoder_output_size'],
         padding_idx=args['padding_idx'],
         casing=args['casing'],
         use_pre=args['use_pre'],
@@ -71,18 +69,17 @@ if __name__ == '__main__':
 
     # wrg_sentence_window_reader args
     parser.add_argument('--sentence_window', type=int, default=5)
+    parser.add_argument('--use_pre', const=True, action='store_const', default=True)
+    parser.add_argument('--use_post', const=True, action='store_const', default=False)
 
     # PooledSentenceTransformerPyramid args
     parser.add_argument('--model', type=str, default="paraphrase-distilroberta-base-v1")
     parser.add_argument('--transformer_batch_size', type=int, default=1)
     parser.add_argument('--transformer_embedding_encoder_type', default='rnn')
-    parser.add_argument('--transformer_embedding_encoder_hidden_size', default=128)
-    parser.add_argument('--encoder_type', type=str, default='identity')
-    parser.add_argument('--transformer_encoder_output_size', default=64)
+    parser.add_argument('--embedding_encoder_output_size', default=128)
+    parser.add_argument('--embedding_encoder_type', type=str, default='identity')
     parser.add_argument('--padding_idx', default=0)
     parser.add_argument('--casing', const=True, action='store_const', default=True)
-    parser.add_argument('--use_pre', const=True, action='store_const', default=True)
-    parser.add_argument('--use_post', const=True, action='store_const', default=False)
 
     args = parser.parse_args()
     run_training(vars(args))

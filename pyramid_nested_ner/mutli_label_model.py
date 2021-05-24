@@ -112,6 +112,8 @@ class DocumentRNNSentenceWindowPyramid(ContextualMultiLabelPyramid):
             use_pre=True,
             use_post=False,
             padding_idx=0,
+            embedding_encoder_type='linear',
+            embedding_encoder_output_size=128,
             hidden_size: int = 128,
             rnn_layers: int = 1,
             reproject_words: bool = True,
@@ -137,7 +139,9 @@ class DocumentRNNSentenceWindowPyramid(ContextualMultiLabelPyramid):
             'dropout': dropout,
             'word_dropout': word_dropout,
             'locked_dropout': locked_dropout,
-            'casing': casing
+            'casing': casing,
+            'embedding_encoder_type': embedding_encoder_type,
+            'embedding_encoder_output_size': embedding_encoder_output_size
         }
 
         super(DocumentRNNSentenceWindowPyramid, self).__init__(
@@ -163,6 +167,8 @@ class DocumentRNNSentenceWindowPyramid(ContextualMultiLabelPyramid):
             device=self.device,
             casing=self._context_model_args['casing'],
             use_pre=self._context_model_args['use_pre'],
+            embedding_encoder_type=self._context_model_args['embedding_encoder_type'],
+            embedding_encoder_output_size=self._context_model_args['embedding_encoder_output_size'],
             use_post=self._context_model_args['use_post']
         )
         context_encoder.to(self.device)
@@ -177,10 +183,9 @@ class PooledSentenceTransformerPyramid(ContextualMultiLabelPyramid):
             entities_lexicon,
             model: str = "paraphrase-distilroberta-base-v1",
             batch_size: int = 1,
-            embedding_encoder_type='mean',
-            embedding_encoder_hidden_size=128,
-            encoder_type: str = 'identity',
-            transformer_encoder_output_size=64,
+            embedding_pooling_method='mean',
+            embedding_encoder_type: str = 'identity',
+            embedding_encoder_output_size=64,
             padding_idx=0,
             casing=True,
             use_pre=True,
@@ -191,10 +196,9 @@ class PooledSentenceTransformerPyramid(ContextualMultiLabelPyramid):
             'word_lexicon': word_lexicon,
             'model': model,
             'batch_size': batch_size,
+            'embedding_pooling_method': embedding_pooling_method,
             'embedding_encoder_type': embedding_encoder_type,
-            'embedding_encoder_hidden_size': embedding_encoder_hidden_size,
-            'encoder_type': encoder_type,
-            'transformer_encoder_output_size': transformer_encoder_output_size,
+            'embedding_encoder_output_size': embedding_encoder_output_size,
             'use_pre': use_pre,
             'use_post': use_post,
             'padding_idx': padding_idx,
@@ -212,10 +216,9 @@ class PooledSentenceTransformerPyramid(ContextualMultiLabelPyramid):
             self._context_model_args['word_lexicon'],
             model=self._context_model_args['model'],
             batch_size=self._context_model_args['batch_size'],
+            embedding_pooling_method=self._context_model_args['embedding_pooling_method'],
             embedding_encoder_type=self._context_model_args['embedding_encoder_type'],
-            embedding_encoder_hidden_size=self._context_model_args['embedding_encoder_hidden_size'],
-            encoder_type=self._context_model_args['encoder_type'],
-            encoder_output_size=self._context_model_args['transformer_encoder_output_size'],
+            embedding_encoder_output_size=self._context_model_args['embedding_encoder_output_size'],
             padding_idx=self._context_model_args['padding_idx'],
             casing=self._context_model_args['casing'],
             use_pre=self._context_model_args['use_pre'],

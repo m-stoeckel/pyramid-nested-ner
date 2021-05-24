@@ -1,4 +1,5 @@
 import itertools
+import sys
 
 import torch
 
@@ -40,7 +41,7 @@ def run_sigmoid_test(args: dict):
     word_lexicon = load_vocab(args['lex_size'])
 
     print("Loading data")
-    train_data = list(itertools.islice(wrg_reader("data/nne_concat/train.txt"), 64))
+    train_data = list(itertools.islice(wrg_reader("data/nne_concat/train.txt"), 256))
     dev_data = list(itertools.islice(wrg_reader("data/nne_concat/dev.txt"), 64))
     test_data = list(itertools.islice(wrg_reader("data/nne_concat/test.txt"), 64))
 
@@ -92,7 +93,6 @@ def run_sigmoid_test(args: dict):
         language_model=args['language_model'],
         char_embeddings_dim=args['char_embeddings_dim'],
         encoder_hidden_size=args['encoder_hidden_size'],
-        encoder_output_size=args['encoder_output_size'],
         decoder_hidden_size=args['decoder_hidden_size'],
         inverse_pyramid=args['inverse_pyramid'],
         custom_tokenizer=args['custom_tokenizer'],
@@ -111,7 +111,7 @@ def run_sentence_window_test(args: dict):
 
     print("Loading data")
     train_data = list(itertools.islice(wrg_sentence_window_reader("data/nne_raw/train/", args['sentence_window']), 64))
-    dev_data = list(itertools.islice(wrg_sentence_window_reader("data/nne_raw/dev/", args['sentence_window']), 64))
+    dev_data = list(itertools.islice(wrg_sentence_window_reader("data/nne_raw/dev/", args['sentence_window']), 64*10))
     test_data = list(itertools.islice(wrg_sentence_window_reader("data/nne_raw/test/", args['sentence_window']), 64))
 
     print("Generating entity lexicon")
@@ -162,8 +162,8 @@ def run_token_window_test(args: dict):
     word_lexicon = load_vocab(args['lex_size'])
 
     print("Loading data")
-    train_data = list(itertools.islice(wrg_token_window_reader("data/nne_raw/train/", args['token_window']), 64))
-    dev_data = list(itertools.islice(wrg_token_window_reader("data/nne_raw/dev/", args['token_window']), 64))
+    train_data = list(itertools.islice(wrg_token_window_reader("data/nne_raw/train/", args['token_window']), 256))
+    dev_data = list(itertools.islice(wrg_token_window_reader("data/nne_raw/dev/", args['token_window']), 64*10))
     test_data = list(itertools.islice(wrg_token_window_reader("data/nne_raw/test/", args['token_window']), 64))
 
     print("Generating entity lexicon")
@@ -220,7 +220,6 @@ def test_document_rnn(word_lexicon, train_dataloader, dev_dataloader, test_datal
         language_model=args['language_model'],
         char_embeddings_dim=args['char_embeddings_dim'],
         encoder_hidden_size=args['encoder_hidden_size'],
-        encoder_output_size=args['encoder_output_size'],
         decoder_hidden_size=args['decoder_hidden_size'],
         inverse_pyramid=args['inverse_pyramid'],
         custom_tokenizer=args['custom_tokenizer'],
@@ -229,6 +228,8 @@ def test_document_rnn(word_lexicon, train_dataloader, dev_dataloader, test_datal
         encoder_dropout=args['encoder_dropout'],
         use_pre=args['use_pre'],
         use_post=args['use_post'],
+        embedding_encoder_output_size=args['embedding_encoder_hidden_size'],
+        embedding_encoder_type=args['embedding_encoder_type'],
         hidden_size=args['hidden_size'],
         rnn_layers=args['rnn_layers'],
         reproject_words=args['reproject_words'],
@@ -254,7 +255,6 @@ def test_sentence_transformer(word_lexicon, train_dataloader, dev_dataloader, te
         language_model=args['language_model'],
         char_embeddings_dim=args['char_embeddings_dim'],
         encoder_hidden_size=args['encoder_hidden_size'],
-        encoder_output_size=args['encoder_output_size'],
         decoder_hidden_size=args['decoder_hidden_size'],
         inverse_pyramid=args['inverse_pyramid'],
         custom_tokenizer=args['custom_tokenizer'],
@@ -263,10 +263,9 @@ def test_sentence_transformer(word_lexicon, train_dataloader, dev_dataloader, te
         encoder_dropout=args['encoder_dropout'],
         model=args['model'],
         batch_size=args['transformer_batch_size'],
-        embedding_encoder_type=args['transformer_embedding_encoder_type'],
-        embedding_encoder_hidden_size=args['transformer_embedding_encoder_hidden_size'],
-        encoder_type=args['encoder_type'],
-        transformer_encoder_output_size=args['transformer_encoder_output_size'],
+        embedding_pooling_method=args['embedding_pooling_method'],
+        embedding_encoder_output_size=args['embedding_encoder_hidden_size'],
+        embedding_encoder_type=args['embedding_encoder_type'],
         dropout=args['encoder_dropout'],
         padding_idx=args['padding_idx'],
         casing=args['casing'],
@@ -295,7 +294,9 @@ def run_training(pyramid_ner, train_dataloader, dev_dataloader, test_dataloader,
     train_report.plot_loss_report()
     train_report.plot_custom_report('micro_f1')
     formatted_report = trainer.test_model(test_dataloader, out_dict=False)
-    print("\n".join(formatted_report.split("\n")[0:8]))
+    print(formatted_report)
+    sys.stdout.flush()
+    # print("\n".join(formatted_report.split("\n")[0:8]))
 
 
 if __name__ == '__main__':
@@ -320,10 +321,9 @@ if __name__ == '__main__':
     # PooledSentenceTransformerPyramid args
     parser.add_argument('--model', type=str, default="paraphrase-distilroberta-base-v1")
     parser.add_argument('--transformer_batch_size', type=int, default=1)
-    parser.add_argument('--transformer_embedding_encoder_type', default='rnn')
-    parser.add_argument('--transformer_embedding_encoder_hidden_size', default=128)
-    parser.add_argument('--encoder_type', type=str, default='identity')
-    parser.add_argument('--transformer_encoder_output_size', default=64)
+    parser.add_argument('--embedding_pooling_method', default='rnn')
+    parser.add_argument('--embedding_encoder_type', type=str, default='linear')
+    parser.add_argument('--embedding_encoder_hidden_size', default=128)
     parser.add_argument('--padding_idx', default=0)
     parser.add_argument('--casing', const=True, action='store_const', default=True)
 

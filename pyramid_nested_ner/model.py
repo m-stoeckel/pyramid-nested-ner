@@ -74,7 +74,7 @@ class PyramidNer(object):
             'language_model': language_model,
             'char_embeddings_dim': char_embeddings_dim,
             'encoder_hidden_size': encoder_hidden_size,
-            'encoder_output_size': encoder_output_size,
+            'embedding_encoder_output_size': encoder_output_size,
             'decoder_hidden_size': decoder_hidden_size,
             'pyramid_max_depth': pyramid_max_depth,
             'batch_first': True,
@@ -198,7 +198,7 @@ class PyramidNer(object):
             self._model_args['word_embeddings'],
             char_embeddings=self._build_char_embeddings(self._model_args['char_embeddings_dim']),
             hidden_size=self._model_args['encoder_hidden_size'],
-            output_size=self._model_args['encoder_output_size'],
+            output_size=self._model_args['embedding_encoder_output_size'],
             rnn_class=nn.LSTM,
             language_model=self._model_args['language_model'],
             dropout=self._model_args['encoder_dropout']
@@ -212,7 +212,7 @@ class PyramidNer(object):
         else:
             pyramid_cls = PyramidDecoder
         pyramid_decoder = pyramid_cls(
-            input_size=self._model_args['encoder_output_size'],
+            input_size=self._model_args['embedding_encoder_output_size'],
             hidden_size=self._model_args['decoder_hidden_size'],
             dropout=self._model_args['decoder_dropout'],
             max_depth=self._model_args['pyramid_max_depth']

@@ -68,7 +68,7 @@ class LatexReporter(StringReporter):
         head_fmt += ' & {:<{score_width}}' * 3
         head_fmt += ' & {:<{support_width}} \\\\'
         report += head_fmt.format(
-            '', *headers,
+            *headers,
             name_width=self.name_width,
             score_width=self.score_width,
             support_width=self.support_width

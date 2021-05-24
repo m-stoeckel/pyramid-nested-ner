@@ -28,8 +28,6 @@ class ContextEncoder(nn.Module):
             self,
             use_pre=True,
             use_post=False,
-            encoder_type: str = 'identity',
-            encoder_output_size=64,
             device='cpu'
     ):
         super(ContextEncoder, self).__init__()
@@ -42,10 +40,6 @@ class ContextEncoder(nn.Module):
         assert self.directions, "Neither 'use_pre' nor 'use_post' is set True!"
 
         self.device = device
-
-        self._init_embeddings()
-
-        self._init_encoder(encoder_type, encoder_output_size)
 
     def _init_embeddings(self):
         pass
@@ -64,6 +58,8 @@ class ContextEncoder(nn.Module):
             self.encoder.to(self.device)
             self.embedding_dim = encoder_output_size
 
+        self._train = False
+
     def to(self, device, *args, **kwargs):
         self.embeddings.to(device, *args, **kwargs)
         self.encoder.to(device, *args, **kwargs)
@@ -72,11 +68,13 @@ class ContextEncoder(nn.Module):
     def train(self, mode: bool = True):
         self.embeddings.train(mode)
         self.encoder.train(mode)
+        self._train = mode
         return super(ContextEncoder, self).train(mode)
 
     def eval(self):
         self.embeddings.eval()
         self.encoder.eval()
+        self._train = False
         return super(ContextEncoder, self).eval()
 
     def forward(
@@ -116,50 +114,35 @@ class DocumentRNNEncoder(ContextEncoder):
             locked_dropout: float = 0.0,
             device='cpu',
             casing=True,
-            encoder_type: str = 'identity',
-            encoder_output_size=64,
+            embedding_encoder_type='linear',
+            embedding_encoder_output_size=128,
             use_pre=True,
             use_post=False
     ):
-        self._embeddings_args = {
-            'word_embeddings': word_embeddings,
-            'lexicon': lexicon,
-            'padding_idx': padding_idx,
-            'hidden_size': hidden_size,
-            'rnn_layers': rnn_layers,
-            'reproject_words': reproject_words,
-            'reproject_words_dimension': reproject_words_dimension,
-            'bidirectional': bidirectional,
-            'dropout': dropout,
-            'word_dropout': word_dropout,
-            'locked_dropout': locked_dropout,
-            'casing': casing,
-        }
         super(DocumentRNNEncoder, self).__init__(
             use_pre,
             use_post,
-            encoder_type,
-            encoder_output_size,
             device
         )
 
-    def _init_embeddings(self):
         self.embeddings = DocumentRNNEmbeddings(
-            self._embeddings_args['word_embeddings'],
-            self._embeddings_args['lexicon'],
-            padding_idx=self._embeddings_args['padding_idx'],
-            hidden_size=self._embeddings_args['hidden_size'],
-            rnn_layers=self._embeddings_args['rnn_layers'],
-            reproject_words=self._embeddings_args['reproject_words'],
-            reproject_words_dimension=self._embeddings_args['reproject_words_dimension'],
-            bidirectional=self._embeddings_args['bidirectional'],
-            dropout=self._embeddings_args['dropout'],
-            word_dropout=self._embeddings_args['word_dropout'],
-            locked_dropout=self._embeddings_args['locked_dropout'],
-            casing=self._embeddings_args['casing'],
+            word_embeddings,
+            lexicon,
+            padding_idx=padding_idx,
+            hidden_size=hidden_size,
+            rnn_layers=rnn_layers,
+            reproject_words=reproject_words,
+            reproject_words_dimension=reproject_words_dimension,
+            bidirectional=bidirectional,
+            dropout=dropout,
+            word_dropout=word_dropout,
+            locked_dropout=locked_dropout,
+            casing=casing,
             device=self.device,
         )
         self.embeddings.to(self.device)
+
+        self._init_encoder(embedding_encoder_type, embedding_encoder_output_size)
 
 
 class SentenceTransformerEncoder(ContextEncoder):
@@ -169,41 +152,30 @@ class SentenceTransformerEncoder(ContextEncoder):
             lexicon,
             model: str = "paraphrase-distilroberta-base-v1",
             batch_size: int = 1,
-            embedding_encoder_type='mean',
-            embedding_encoder_hidden_size=128,
-            encoder_type: str = 'identity',
-            encoder_output_size=64,
+            embedding_pooling_method='mean',
+            embedding_encoder_type='linear',
+            embedding_encoder_output_size=128,
             padding_idx=0,
             casing=True,
             device='cpu',
             use_pre=True,
             use_post=False
     ):
-        self._embeddings_args = {
-            'lexicon': lexicon,
-            'model': model,
-            'batch_size': batch_size,
-            'embedding_encoder_type': embedding_encoder_type,
-            'embedding_encoder_hidden_size': embedding_encoder_hidden_size,
-            'padding_idx': padding_idx,
-            'casing': casing,
-            'device': device,
-        }
         super(SentenceTransformerEncoder, self).__init__(
             use_pre,
             use_post,
-            encoder_type,
-            encoder_output_size
+            device
         )
 
-    def _init_embeddings(self):
         self.embeddings = PooledSentenceTransformerEmbeddings(
-            self._embeddings_args['lexicon'],
-            model=self._embeddings_args['model'],
-            batch_size=self._embeddings_args['batch_size'],
-            embedding_encoder_type=self._embeddings_args['embedding_encoder_type'],
-            padding_idx=self._embeddings_args['padding_idx'],
-            casing=self._embeddings_args['casing'],
-            device=self._embeddings_args['device'],
+            lexicon,
+            model=model,
+            batch_size=batch_size,
+            embedding_pooling_method=embedding_pooling_method,
+            padding_idx=padding_idx,
+            casing=casing,
+            device=self.device,
         )
         self.embeddings.to(self.device)
+
+        self._init_encoder(embedding_encoder_type, embedding_encoder_output_size)
